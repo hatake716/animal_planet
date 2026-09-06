@@ -8,6 +8,7 @@
 """
 import glob
 import os
+import re
 import subprocess
 import sys
 from common import load, save
@@ -16,6 +17,16 @@ REGIONS = ["日本", "東アジア", "東南アジア", "南アジア", "中央�
            "北アメリカ", "中央アメリカ・カリブ", "南アメリカ", "オセアニア", "海洋", "北極・南極"]
 GROUP_CODE = {"哺乳類": 0, "鳥類": 1, "爬虫類": 2, "両生類": 3, "魚類": 4, "無脊椎動物": 5}
 MAX_SIDE = 640
+JA_CHARS = re.compile(r"[぀-ヿ一-鿿]")
+
+
+def fix_rank_suffix(label, suffix):
+    """和名の目・科ラベルに階級の接尾辞がない(例「カメ」「トガリネズミ」)場合に補う。ラテン語名はそのまま。"""
+    if not label or not JA_CHARS.search(label) or label.endswith(suffix):
+        return label
+    if suffix == "目" and label.endswith(("目", "類")):
+        return label
+    return label + suffix
 
 
 def convert_image(src, dst):
@@ -62,6 +73,8 @@ def main():
     print(f"edited: {len(edited)}/{len(index)}, fixes applied: {fixes}")
 
     os.makedirs(os.path.join(assets, "img"), exist_ok=True)
+    from collections import Counter
+    title_count = Counter(it["jaTitle"] for it in index)
     entries = []
     credits = []
     missing = []
@@ -96,18 +109,27 @@ def main():
                 author = m.get("artist") or ""
                 lic = m.get("license") or m.get("licenseShort") or ""
                 lic_url = m.get("licenseUrl") or ""
-                credits.append({"id": it["id"], "name": it["name"], "file": img_file, "author": author, "license": lic, "licenseUrl": lic_url, "url": m.get("descUrl", "")})
+                credits.append({"id": it["id"], "name": name, "file": img_file, "author": author, "license": lic, "licenseUrl": lic_url, "url": m.get("descUrl", "")})
         yomi = e.get("yomi") or ""
-        order_ja = (e.get("orderJa") or "").strip() or it["orderJa"]
-        family_ja = (e.get("familyJa") or "").strip() or it["familyJa"]
+        order_ja = fix_rank_suffix((e.get("orderJa") or "").strip() or it["orderJa"], "目")
+        family_ja = fix_rank_suffix((e.get("familyJa") or "").strip() or it["familyJa"], "科")
+        # Wikidata の和名ラベルが学名のまま(例 "Padda oryzivora")なら、日本語版記事名(例 "ブンチョウ")を和名にする
+        name = it["name"]
+        aliases = list(it["aliases"])
+        # (同じ日本語版記事名を複数の種が共有している場合は、重複名になるので置き換えない)
+        if not JA_CHARS.search(name) and JA_CHARS.search(it["jaTitle"] or "") and title_count[it["jaTitle"]] == 1:
+            aliases = [name] + [a for a in aliases if a != it["jaTitle"]]
+            name = it["jaTitle"]
+            if yomi == "" or yomi == it["name"]:
+                yomi = ""
         row = [
-            it["id"], it["name"], "|".join(it["aliases"]), it["sci"], it["jaTitle"], it["enTitle"] or "",
+            it["id"], name, "|".join(aliases), it["sci"], it["jaTitle"], it["enTitle"] or "",
             round(lat, 4), round(lon, 4), (e.get("place") or "")[:30],
             GROUP_CODE[it["group"]], it["status"], mask, int(e.get("importance") or 1),
             (e.get("desc") or "").strip(), (e.get("habitat") or "").strip(), (e.get("threats") or "").strip(),
             order_ja, family_ja, img_file, author, lic, lic_url,
         ]
-        if yomi and yomi != it["name"]:
+        if yomi and yomi != name:
             row.append(yomi)
         entries.append(row)
     # アプリ同梱用はコンパクトに書く(インデントなし)

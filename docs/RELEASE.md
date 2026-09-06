@@ -32,7 +32,7 @@ Google Play アプリ署名(Play App Signing)を利用する場合、この鍵�
 R8 縮小・リソース縮小を有効にしています(`isMinifyEnabled = true` / `isShrinkResources = true`)。
 JSON は `android.util.JsonReader` の手書きパーサのみ使用しており、リフレクション依存の keep ルールは不要です。
 
-同梱アセット(地球タイル約 42MB、写真約 1,000 枚)により AAB は 100MB を超えます。Google Play の AAB 上限(基本モジュール 200MB)の範囲内です。
+同梱アセット(地球タイル約 42MB、写真 1,009 枚 約 47MB)により AAB は約 90MB になります。Google Play の AAB 上限(基本モジュール 200MB)の範囲内です。
 
 ## Play Console 提出
 

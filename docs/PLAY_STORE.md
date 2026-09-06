@@ -1,6 +1,7 @@
 # Google Play 公開の準備チェックリスト
 
 このアプリを Google Play で(有料アプリとして)公開するための、ストア掲載情報とコンプライアンスのまとめ。
+**提出用の一式(手順書・掲載文・申告フォームの回答・グラフィック・スクリーンショット)は [`docs/play/SUBMISSION.md`](play/SUBMISSION.md) にまとめてあります。**
 
 ## 現在の状態
 
@@ -33,7 +34,7 @@ Play App Signing を使う場合、このローカル鍵は「アップロード
   > ・地図画像・写真・解説はアプリに同梱しているため、図鑑の閲覧はオフラインでも動きます。
   >
   > 写真は Wikimedia Commons の自由ライセンス画像(作者・ライセンスをアプリ内に表示)、解説は Wikipedia、分類と評価は Wikidata、地図画像は NASA Blue Marble(パブリックドメイン)です。
-- **スクリーンショット**: `docs/images/01_globe.png` 〜 `06_photo.png`(1080×2400。Play では 320〜3840px の範囲で受理)。
+- **スクリーンショット**: `docs/play/screenshots/01_globe.png` 〜 `07_filtered.png`(1080×2160。Play の規則「最大辺は最小辺の 2 倍以下」に合わせたサイズ。`docs/images/` の 1080×2400 は README 用)。
 - **アイコン**: `docs/play/icon_512.png`(512×512)。
 - **フィーチャーグラフィック**: `docs/play/feature_1024x500.png`(1024×500)。
 

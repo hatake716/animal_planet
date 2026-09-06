@@ -1,0 +1,66 @@
+# Google Play 提出手順書(v1.0.1)
+
+このフォルダ(`docs/play/`)に、Play Console に入力・アップロードするものを一式まとめています。
+AAB / APK / mapping は Git に含めず、`dist/play-v1.0.1/`(ローカル)と GitHub Release の添付にあります。
+
+| 用途 | ファイル |
+|---|---|
+| アプリ本体(Play にアップロード) | `dist/play-v1.0.1/animal_planet-v1.0.1.aab`(署名済み、約 92MB)／ [Release v1.0.1](https://github.com/hatake716/animal_planet/releases/tag/v1.0.1) |
+| 難読化マッピング(クラッシュ解析用、任意) | `dist/play-v1.0.1/mapping-v1.0.1.txt` |
+| 動作確認用 APK | `dist/play-v1.0.1/animal_planet-v1.0.1.apk` |
+| ストア掲載文(アプリ名・簡単な説明・詳しい説明・新機能) | [`LISTING.md`](LISTING.md) |
+| 申告フォームの回答(データセーフティ・コンテンツレーティング・アプリのコンテンツ) | [`FORMS.md`](FORMS.md) |
+| アプリアイコン 512×512 | `icon_512.png` |
+| フィーチャーグラフィック 1024×500 | `feature_1024x500.png` |
+| スマートフォン用スクリーンショット 1080×2160(7 枚) | `screenshots/01_globe.png` 〜 `07_filtered.png` |
+| プライバシーポリシー URL | https://hatake716.github.io/animal_planet/PRIVACY/ |
+| 出典・ライセンス(審査での問い合わせに備えて) | [`../../NOTICE.md`](../../NOTICE.md)、[`../CREDITS.md`](../CREDITS.md) |
+
+## 1. 事前準備(Play Console)
+
+1. Google Play デベロッパーアカウント(登録料あり)。
+2. **有料アプリを販売するには販売者アカウント(お支払いプロファイル)が必要**。Play Console の「設定 → お支払いプロファイル」で作成し、税務情報を登録する。
+3. アップロード鍵はローカルの `animal-planet-release.jks`(`keystore.properties` にパスワード)。**紛失厳禁**。Play App Signing を使う(既定)と、この鍵は「アップロード鍵」として登録される。
+
+## 2. アプリの作成
+
+- 「アプリを作成」→ アプリ名: **地球儀で見る絶滅危惧種生物図鑑**、デフォルトの言語: 日本語(ja-JP)、アプリ/ゲーム: アプリ、無料/有料: **有料**(無料で公開すると後から有料にできない)。
+
+## 3. ダッシュボードの「アプリをセットアップ」
+
+Play Console の設問と回答は [`FORMS.md`](FORMS.md) の順番どおり。要点:
+
+- プライバシーポリシー: 上記 URL。
+- アプリのアクセス権: 「すべての機能が特別なアクセス権なしで利用可能」。
+- 広告: 「広告を含まない」。
+- コンテンツのレーティング: IARC アンケート(FORMS.md の回答)。
+- ターゲット ユーザーおよびコンテンツ: **13 歳以上**(YouTube をアプリ内ブラウザで表示するため 13 歳未満を含めない)。
+- ニュースアプリ: いいえ。COVID-19 接触追跡: いいえ。データセーフティ: 収集・共有なし(FORMS.md)。
+- 政府アプリ: いいえ。金融機能: なし。健康: 該当なし。
+- アプリのカテゴリ: **教育**。タグは任意(教育、参考資料、動物 など)。
+- 連絡先: デベロッパーのメールアドレス(Play Console に登録したもの)。
+
+## 4. ストアの設定(メインのストアの掲載情報)
+
+[`LISTING.md`](LISTING.md) の文言をコピーする。
+
+- アプリ名(30 文字以内)、簡単な説明(80 文字以内)、詳しい説明(4000 文字以内)。
+- グラフィック: アイコン `icon_512.png`、フィーチャーグラフィック `feature_1024x500.png`、スマートフォンのスクリーンショット `screenshots/*.png`(2〜8 枚。1080×2160 は「最大辺が最小辺の 2 倍以下」の規則を満たす)。7 インチ / 10 インチ タブレット用は任意。
+
+## 5. リリース
+
+1. 「テスト → 内部テスト」で新しいリリースを作成し、AAB をアップロード。リリースノートは LISTING.md の「新機能」。
+2. 内部テストのテスターとして自分の Google アカウントを追加し、Play 経由でインストールして動作確認(R8 縮小版で地球儀・検索・絞り込み・詳細・写真・Wikipedia・動画)。
+3. 「製品版」を作成して同じ AAB を昇格(または再アップロード)。国/地域を選択(日本、必要なら全世界)。
+4. 「収益化 → 商品 → アプリの価格」で価格を設定(国ごとの価格は自動換算または個別設定)。
+5. 審査に送信。初回審査は数日かかることがある。
+
+## 6. 審査で聞かれやすい点への備え
+
+- 写真・解説の権利: NOTICE.md と docs/CREDITS.md に出典・ライセンスを明記(CC0 / PD / CC BY / CC BY-SA のみ、作者名をアプリ内表示)。
+- 「Animal Planet」の商標: アプリ名・アイコン・applicationId(`io.github.hatake716.endangeredglobe`)のいずれにも含めていない(リポジトリ名のみ)。
+- 外部コンテンツ: Wikipedia / YouTube / Wikimedia Commons はアプリ内ブラウザで表示するだけで、埋め込み再生やスクレイピングはしていない。
+
+## 7. 更新時
+
+`app/build.gradle.kts` の `versionCode` を上げ(`versionName` も更新)、`./gradlew bundleRelease` で AAB を作り直して製品版に新しいリリースを作成する。データ(species.json / 写真)を更新した場合は `tools/validate.py` と `tools/make_credits.py` を実行して `docs/CREDITS.md` も更新する。

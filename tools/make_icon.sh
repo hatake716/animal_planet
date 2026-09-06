@@ -61,8 +61,15 @@ ffmpeg -v error -y -i "$TMP/bg.png" -vf scale=432:432:flags=lanczos "$RES/drawab
 if [ -n "$PLAY" ]; then
   mkdir -p "$PLAY"
   ffmpeg -v error -y -i "$TMP/legacy.png" -vf "scale=512:512:flags=lanczos" "$PLAY/icon_512.png"
-  # フィーチャーグラフィック 1024×500: 背景に地球儀を左寄せ
-  ffmpeg -v error -y -f lavfi -i "color=0x061410:s=1024x500" -i "$TMP/globe.png" -filter_complex "[1]scale=440:440[g];[0][g]overlay=60:30" -frames:v 1 "$PLAY/feature_1024x500.png"
+  # フィーチャーグラフィック 1024×500: 左に地球儀、右にアプリ名(FONT に日本語フォントのパスを渡す。なければ文字なし)
+  FONT="${FONT:-$(fc-list :lang=ja 2>/dev/null | head -1 | cut -d: -f1)}"
+  TXT=""
+  if [ -n "$FONT" ]; then
+    TXT=",drawtext=fontfile='$FONT':text='地球儀で見る':x=470:y=112:fontsize=50:fontcolor=white"
+    TXT="$TXT,drawtext=fontfile='$FONT':text='絶滅危惧種生物図鑑':x=470:y=178:fontsize=60:fontcolor=white"
+    TXT="$TXT,drawtext=fontfile='$FONT':text='世界の絶滅危惧種 1,063 種を':x=472:y=295:fontsize=30:fontcolor=0xA5D6A7"
+    TXT="$TXT,drawtext=fontfile='$FONT':text='写真と解説つきで、オフラインでも':x=472:y=340:fontsize=30:fontcolor=0xA5D6A7"
+  fi
+  ffmpeg -v error -y -f lavfi -i "color=0x061410:s=1024x500" -i "$TMP/globe.png" -filter_complex "[1]scale=420:420[g];[0][g]overlay=30:40$TXT" -frames:v 1 "$PLAY/feature_1024x500.png"
 fi
-cp "$TMP/legacy.png" "${PLAY:-$TMP}/icon_1024.png" 2>/dev/null || true
 rm -rf "$TMP"; echo "icon generated into $RES"

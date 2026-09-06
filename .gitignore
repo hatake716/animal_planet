@@ -26,3 +26,6 @@ keystore.properties
 # OS
 .DS_Store
 bmng_*.jpg
+
+# Play 提出用の成果物(AAB/APK/mapping は Release ページと dist/ に置く)
+dist/

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,7 +77,15 @@ fun DetailCard(
         tonalElevation = 6.dp,
         shadowElevation = 10.dp,
     ) {
-        Column(Modifier.padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 14.dp).animateContentSize()) {
+        // 横画面など高さが足りない画面でもボタン行が押し出されないよう、カード全体の高さを画面の 88% までに抑え、
+        // 展開時の本文(スクロール)だけを伸縮させる。
+        val screenH = LocalConfiguration.current.screenHeightDp
+        Column(
+            Modifier
+                .heightIn(max = (screenH * 0.88f).dp)
+                .padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 14.dp)
+                .animateContentSize(),
+        ) {
             Row(verticalAlignment = Alignment.Top) {
                 if (!expanded && entry.image != null) {
                     SpeciesImage(entry, maxSide = 240, modifier = Modifier.size(84.dp).clickable(onClick = onPhoto), cornerRadius = 12.dp)
@@ -122,7 +132,7 @@ fun DetailCard(
                 IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "閉じる") }
             }
             if (expanded) {
-                ExpandedBody(entry, catalog, onPhoto, onCommons)
+                ExpandedBody(entry, catalog, compact = screenH < 560, onPhoto, onCommons)
             } else if (entry.desc.isNotBlank()) {
                 Text(
                     entry.desc,
@@ -161,61 +171,68 @@ fun DetailCard(
 }
 
 @Composable
-private fun ExpandedBody(entry: Entry, catalog: Catalog, onPhoto: () -> Unit, onCommons: () -> Unit) {
-    Column(Modifier.padding(top = 8.dp, end = 8.dp)) {
-        val credit = entry.image
-        if (credit != null) {
-            SpeciesImage(
-                entry, maxSide = 640,
-                modifier = Modifier.fillMaxWidth().height(190.dp).clickable(onClick = onPhoto),
-                cornerRadius = 14.dp,
-            )
-            Text(
-                "写真: ${credit.line}(Wikimedia Commons)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 3.dp).clickable(onClick = onCommons),
-            )
+private fun ColumnScope.ExpandedBody(entry: Entry, catalog: Catalog, compact: Boolean, onPhoto: () -> Unit, onCommons: () -> Unit) {
+    val credit = entry.image
+    if (credit != null) {
+        SpeciesImage(
+            entry, maxSide = 640,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp).height(if (compact) 110.dp else 190.dp).clickable(onClick = onPhoto),
+            cornerRadius = 14.dp,
+        )
+        Text(
+            "写真: ${credit.line}(Wikimedia Commons)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp, end = 8.dp).clickable(onClick = onCommons),
+        )
+    }
+    Column(
+        Modifier
+            .weight(1f, fill = false)
+            .let { if (compact) it else it.heightIn(max = 280.dp) }
+            .padding(top = 6.dp, end = 8.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Text(entry.status.label, style = MaterialTheme.typography.labelMedium, color = entry.status.color, fontWeight = FontWeight.SemiBold)
+        if (entry.aliases.isNotEmpty()) {
+            Text("別名: " + entry.aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Column(Modifier.padding(top = 6.dp).heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
-            Text(entry.status.label, style = MaterialTheme.typography.labelMedium, color = entry.status.color, fontWeight = FontWeight.SemiBold)
-            if (entry.aliases.isNotEmpty()) {
-                Text("別名: " + entry.aliases.joinToString(" / "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (entry.taxonomyLine.isNotBlank()) {
-                Text("分類: ${entry.group.label} ${entry.taxonomyLine}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (entry.place.isNotBlank()) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                    Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(entry.place, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            val regions = catalog.regions.withIndex().filter { entry.inRegion(it.index) }.joinToString("・") { it.value }
-            if (regions.isNotBlank()) {
-                Text("生息地域: $regions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (entry.desc.isNotBlank()) {
-                Text(entry.desc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
-            }
-            if (entry.habitat.isNotBlank()) {
-                Text("生息環境: ${entry.habitat}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
-            }
-            if (entry.threats.isNotBlank()) {
-                Text("主な脅威: ${entry.threats}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
-            }
-            if (entry.hasWikipedia) {
-                Text("Wikipedia 記事: ${entry.wikiTitle}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-            }
-            Text(
-                "解説・生息地の出典: Wikipedia ／ 分類・評価(IUCN カテゴリ): Wikidata",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 2.dp),
-            )
+        if (entry.taxonomyLine.isNotBlank()) {
+            Text("分類: ${entry.group.label} ${entry.taxonomyLine}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        if (entry.place.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(entry.place, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        val regions = catalog.regions.withIndex().filter { entry.inRegion(it.index) }.joinToString("・") { it.value }
+        if (regions.isNotBlank()) {
+            Text("生息地域: $regions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (entry.desc.isNotBlank()) {
+            Text(entry.desc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (entry.habitat.isNotBlank()) {
+            Text("生息環境: ${entry.habitat}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (entry.threats.isNotBlank()) {
+            Text("主な脅威: ${entry.threats}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (entry.hasWikipedia) {
+            Text("Wikipedia 記事: ${entry.wikiTitle}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (entry.enTitle.isNotBlank()) {
+            Text("English Wikipedia: ${entry.enTitle}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text(
+            "解説・生息環境・脅威: Wikipedia(日本語版・英語版)の記事冒頭をもとにした要約(CC BY-SA 4.0)／ 分類・評価: Wikidata",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }

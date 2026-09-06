@@ -164,6 +164,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         filter = MarkerFilter()
     }
 
+    fun toggleGroupFilter(g: TaxonGroup) {
+        // コンポーズ時に掴んだ値ではなく現在値から更新する(同一フレーム内の 2 タップで片方が消えるのを防ぐ)
+        val cur = filter
+        filter = cur.copy(groups = cur.groups.toMutableSet().apply { if (!add(g)) remove(g) })
+    }
+
+    fun toggleRegionFilter(i: Int) {
+        val cur = filter
+        filter = cur.copy(regions = cur.regions.toMutableSet().apply { if (!add(i)) remove(i) })
+    }
+
+    /**
+     * 絞り込みシートを閉じるときの正規化。ある欄で全項目をチェックした状態は「絞っていない」と同じ意味なので
+     * 空集合に戻す。これで「全選択」で閉じた後も、次に開いたときは起動時と同じ全解除の状態から始まり、
+     * 一部だけ選んだ欄はそのまま残る。
+     */
+    fun normalizeFilter() {
+        val regionCount = catalog?.regions?.size ?: 0
+        val f = filter
+        val groups = if (f.groups.size >= TaxonGroup.entries.size) emptySet() else f.groups
+        val regions = if (regionCount > 0 && f.regions.size >= regionCount) emptySet() else f.regions
+        if (groups.size != f.groups.size || regions.size != f.regions.size) filter = MarkerFilter(groups, regions)
+    }
+
     fun isFilterActive(): Boolean {
         val f = filter
         return f.groupFilterActive() || f.regionFilterActive(catalog?.regions?.size ?: 0)

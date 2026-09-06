@@ -169,7 +169,8 @@ class MarkerLayer(private val entries: List<Entry>, private val density: Float) 
         val limbMargin = 0.02
         for (pi in 0 until n) {
             val i = priorityOrder[pi]
-            if (!enabled[i]) continue
+            // 絞り込みで除外中でも、選択中の種(検索・一覧から選んだもの)は必ず描く
+            if (!enabled[i] && entries[i].id != sel) continue
             val x = px[i]; val y = py[i]; val z = pz[i]
             // 地平線の少し内側までを表示
             if ((eye[0] - x) * x + (eye[1] - y) * y + (eye[2] - z) * z <= limbMargin) continue

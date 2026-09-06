@@ -11,13 +11,19 @@ val keystorePropsFile = rootProject.file("keystore.properties")
 val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
+// 署名設定がないまま release を作ると未署名の AAB/APK になる(Play にアップロードできない)ので警告する
+if (!keystorePropsFile.exists() && gradle.startParameter.taskNames.any { it.contains("Release") }) {
+    logger.warn("WARNING: keystore.properties がないため release は未署名になります(docs/RELEASE.md 参照)")
+}
 
 android {
     namespace = "io.github.hatake716.animalplanet"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.hatake716.animalplanet"
+        // Play ストアの URL に露出し、公開後は変更できない。第三者の商標(Animal Planet)を含めないよう
+        // リポジトリ名とは別の中立な名前にしている(コードのパッケージ名 namespace は変更不要)。
+        applicationId = "io.github.hatake716.endangeredglobe"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
@@ -81,7 +87,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.webkit)
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.tooling.preview)

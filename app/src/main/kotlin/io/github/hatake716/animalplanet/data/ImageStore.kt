@@ -18,14 +18,17 @@ class ImageStore(context: Context) {
     }
 
     /** キャッシュにあれば同期的に返す(一覧のスクロール中のちらつき防止)。 */
-    fun peek(path: String, maxSide: Int): Bitmap? = cache.get("$path@$maxSide")
+    fun peek(path: String, maxSide: Int): Bitmap? = cache.get(key(path, maxSide))
+
+    /** 同梱写真は長辺 MAX_ASSET_SIDE 以下なので、それ以上の要求は同じデコード結果になる。キャッシュキーも揃える。 */
+    private fun key(path: String, maxSide: Int): String = "$path@${maxSide.coerceAtMost(MAX_ASSET_SIDE)}"
 
     /**
      * @param maxSide 長辺の上限(px)。元は長辺 640px 程度。
      * 失敗(アセットなし・OOM)時は null。
      */
     suspend fun load(path: String, maxSide: Int): Bitmap? {
-        val key = "$path@$maxSide"
+        val key = key(path, maxSide)
         cache.get(key)?.let { return it }
         return withContext(Dispatchers.IO) {
             try {
@@ -51,6 +54,9 @@ class ImageStore(context: Context) {
     }
 
     companion object {
+        /** assemble.py が書き出す写真の長辺上限(px)。 */
+        const val MAX_ASSET_SIDE = 640
+
         @Volatile private var instance: ImageStore? = null
         fun get(context: Context): ImageStore =
             instance ?: synchronized(this) { instance ?: ImageStore(context).also { instance = it } }

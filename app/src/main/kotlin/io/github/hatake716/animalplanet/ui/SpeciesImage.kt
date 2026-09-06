@@ -13,8 +13,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,9 @@ import io.github.hatake716.animalplanet.data.RedListStatus
 /**
  * 同梱写真(assets/img/{id}.jpg)を表示する。写真がない種は分類色の薄い背景にアイコンを出す。
  * @param maxSide デコード時の長辺上限(px)。一覧は小さく、詳細は大きく。
+ *
+ * 状態は remember(path, maxSide) でキーごとに作り直す。produceState はキーが変わっても内部の値を
+ * 引き継ぐため、別の種に切り替えた瞬間に前の種の写真が残る(名前と写真が食い違う)。
  */
 @Composable
 fun SpeciesImage(
@@ -45,8 +49,9 @@ fun SpeciesImage(
     val context = LocalContext.current
     val path = entry.imageAsset
     val store = ImageStore.get(context)
-    val bitmap by produceState<Bitmap?>(initialValue = if (path == null) null else store.peek(path, maxSide), key1 = path, key2 = maxSide) {
-        if (path != null && value == null) value = store.load(path, maxSide)
+    val bitmapState = remember(path, maxSide) { mutableStateOf<Bitmap?>(if (path == null) null else store.peek(path, maxSide)) }
+    LaunchedEffect(path, maxSide) {
+        if (path != null && bitmapState.value == null) bitmapState.value = store.load(path, maxSide)
     }
     Box(
         modifier
@@ -54,7 +59,7 @@ fun SpeciesImage(
             .background(if (tintBackground) entry.group.color.copy(alpha = 0.16f) else Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
-        val bmp = bitmap
+        val bmp = bitmapState.value
         if (bmp != null) {
             Image(bmp.asImageBitmap(), contentDescription = entry.name, modifier = Modifier.fillMaxSize(), contentScale = contentScale)
         } else if (path == null) {

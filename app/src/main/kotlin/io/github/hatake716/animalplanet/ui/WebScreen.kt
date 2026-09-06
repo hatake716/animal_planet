@@ -35,6 +35,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +59,14 @@ fun WebScreen(url: String, title: String, onClose: () -> Unit) {
     var canGoBack by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    // レンダラプロセスが落ちて WebView を破棄した後は、再試行で WebView を作り直す(generation を変えて factory を再実行)
+    var generation by remember { mutableIntStateOf(0) }
+    var lastUrl by remember { mutableStateOf(url) }
+    fun reloadOrRecreate() {
+        error = null
+        val w = webView
+        if (w == null) generation++ else w.reload()
+    }
 
     BackHandler {
         val w = webView
@@ -75,7 +85,7 @@ fun WebScreen(url: String, title: String, onClose: () -> Unit) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { webView?.reload() }) { Icon(Icons.Default.Refresh, contentDescription = "再読み込み") }
+                    IconButton(onClick = { reloadOrRecreate() }) { Icon(Icons.Default.Refresh, contentDescription = "再読み込み") }
                     IconButton(onClick = {
                         val current = webView?.url ?: url
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(current))) }
@@ -90,6 +100,7 @@ fun WebScreen(url: String, title: String, onClose: () -> Unit) {
                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             }
             Box(Modifier.fillMaxSize()) {
+                key(generation) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
@@ -115,6 +126,7 @@ fun WebScreen(url: String, title: String, onClose: () -> Unit) {
                                 override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                                     error = null
                                     canGoBack = view.canGoBack()
+                                    if (!url.isNullOrBlank()) lastUrl = url
                                 }
 
                                 override fun onPageFinished(view: WebView, url: String?) {
@@ -149,11 +161,12 @@ fun WebScreen(url: String, title: String, onClose: () -> Unit) {
                                     if (!t.isNullOrBlank()) pageTitle = t
                                 }
                             }
-                            loadUrl(url)
+                            loadUrl(lastUrl)
                             webView = this
                         }
                     },
                 )
+                }
                 val err = error
                 if (err != null) {
                     Column(
@@ -162,7 +175,7 @@ fun WebScreen(url: String, title: String, onClose: () -> Unit) {
                     ) {
                         Text("ページを読み込めませんでした", style = MaterialTheme.typography.titleMedium)
                         Text("インターネット接続を確認してください\n$err", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
-                        Button(onClick = { error = null; webView?.reload() }) { Text("再試行") }
+                        Button(onClick = { reloadOrRecreate() }) { Text("再試行") }
                     }
                 }
             }

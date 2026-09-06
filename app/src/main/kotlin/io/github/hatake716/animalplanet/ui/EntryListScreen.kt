@@ -80,9 +80,16 @@ fun EntryListScreen(
     var showSearch by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     // チェックした項目だけ表示。空(何もチェックしていない)は絞り込みなし＝全件。地球儀側の MarkerFilter と同じ意味。
-    var groupFilter by remember { mutableStateOf<Set<TaxonGroup>>(emptySet()) }
-    var regionFilter by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    // Activity 再生成(フォントサイズ変更など)でも検索語・並び順と一緒に残るよう rememberSaveable にする。
+    var groupOrdinals by rememberSaveable { mutableStateOf<List<Int>>(emptyList()) }
+    var regionList by rememberSaveable { mutableStateOf<List<Int>>(emptyList()) }
+    val groupFilter: Set<TaxonGroup> = remember(groupOrdinals) { groupOrdinals.map { TaxonGroup.entries[it] }.toSet() }
+    val regionFilter: Set<Int> = remember(regionList) { regionList.toSet() }
+    fun setGroups(set: Set<TaxonGroup>) { groupOrdinals = set.map { it.ordinal }.sorted() }
+    fun setRegions(set: Set<Int>) { regionList = set.sorted() }
     val listState = rememberLazyListState()
+    // 五十音順のキーはカタログ単位で 1 回だけ計算する
+    val kanaKeys = remember(catalog) { catalog.entries.associate { it.id to sortKey(if (it.yomi.isNotEmpty()) it.yomi else it.name) } }
 
     val rows = remember(source, sort, groupFilter, regionFilter, query, catalog) {
         val q = Catalog.normalize(query)
@@ -90,19 +97,10 @@ fun EntryListScreen(
         val filtered = source.filter { e ->
             if (groupFilter.isNotEmpty() && e.group !in groupFilter) return@filter false
             if (regionFilter.isNotEmpty() && (e.regionMask and regionBits) == 0) return@filter false
-            if (q.isNotEmpty()) {
-                val hit = Catalog.normalize(e.name).contains(q) ||
-                    e.aliases.any { Catalog.normalize(it).contains(q) } ||
-                    Catalog.normalize(e.sci).contains(q) ||
-                    Catalog.normalize(e.wikiTitle).contains(q) ||
-                    Catalog.normalize(e.familyJa).contains(q) ||
-                    Catalog.normalize(e.orderJa).contains(q) ||
-                    Catalog.normalize(e.place).contains(q)
-                if (!hit) return@filter false
-            }
+            if (q.isNotEmpty() && !catalog.matches(e, q)) return@filter false
             true
         }
-        buildRows(filtered, sort)
+        buildRows(filtered, sort, kanaKeys)
     }
 
     Scaffold(
@@ -169,20 +167,25 @@ fun EntryListScreen(
             }
 
             if (showFilterRow) {
-                // 全選択 / 全解除(地球儀の絞り込みシートと同じ操作)
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = {
-                        groupFilter = TaxonGroup.entries.toSet()
-                        regionFilter = catalog.regions.indices.toSet()
-                    }) { Text("全選択", style = MaterialTheme.typography.labelMedium) }
-                    TextButton(onClick = {
-                        groupFilter = emptySet()
-                        regionFilter = emptySet()
-                    }) { Text("全解除", style = MaterialTheme.typography.labelMedium) }
+                // 全選択の下に全解除(地球儀の絞り込みシートと同じ配置・同じ操作)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (groupFilter.isEmpty() && regionFilter.isEmpty()) "見たい項目にチェックを入れてください(未選択の欄はすべて表示)"
+                        else "チェックした項目だけを表示しています",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        TextButton(onClick = {
+                            setGroups(TaxonGroup.entries.toSet())
+                            setRegions(catalog.regions.indices.toSet())
+                        }) { Text("全選択", style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = {
+                            setGroups(emptySet())
+                            setRegions(emptySet())
+                        }) { Text("全解除", style = MaterialTheme.typography.labelMedium) }
+                    }
                 }
                 // 分類チップ(横スクロール)
                 Row(
@@ -193,7 +196,7 @@ fun EntryListScreen(
                     for (g in TaxonGroup.entries) {
                         val on = g in groupFilter
                         FilterChip(selected = on, onClick = {
-                            groupFilter = groupFilter.toMutableSet().apply { if (on) remove(g) else add(g) }
+                            setGroups(groupFilter.toMutableSet().apply { if (on) remove(g) else add(g) })
                         }, label = { Text(g.label, style = MaterialTheme.typography.labelSmall) })
                     }
                 }
@@ -207,7 +210,7 @@ fun EntryListScreen(
                     for ((i, rg) in catalog.regions.withIndex()) {
                         val on = i in regionFilter
                         FilterChip(selected = on, onClick = {
-                            regionFilter = regionFilter.toMutableSet().apply { if (on) remove(i) else add(i) }
+                            setRegions(regionFilter.toMutableSet().apply { if (on) remove(i) else add(i) })
                         }, label = { Text(rg, style = MaterialTheme.typography.labelSmall) })
                     }
                 }
@@ -268,7 +271,7 @@ private sealed class ListRow {
     class Item(val entry: Entry) : ListRow()
 }
 
-private fun buildRows(entries: List<Entry>, sort: SortMode): List<ListRow> {
+private fun buildRows(entries: List<Entry>, sort: SortMode, kanaKeys: Map<Int, String>): List<ListRow> {
     val out = ArrayList<ListRow>()
     when (sort) {
         SortMode.GROUP -> {
@@ -294,8 +297,8 @@ private fun buildRows(entries: List<Entry>, sort: SortMode): List<ListRow> {
             }
         }
         SortMode.KANA -> {
-            // 読み(yomi)があればそれを、なければ和名を正規化した読みキーで並べ替える。キーは 1 回だけ計算する。
-            val keyed = entries.map { it to sortKey(if (it.yomi.isNotEmpty()) it.yomi else it.name) }
+            // 読み(yomi)があればそれを、なければ和名を正規化した読みキー(カタログ単位で計算済み)で並べ替える
+            val keyed = entries.map { it to (kanaKeys[it.id] ?: sortKey(it.name)) }
                 .sortedWith(compareBy({ it.second }, { it.first.id }))
             var last = ""
             for ((e, key) in keyed) {

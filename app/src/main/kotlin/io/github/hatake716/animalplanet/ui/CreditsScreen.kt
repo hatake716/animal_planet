@@ -57,7 +57,7 @@ fun CreditsScreen(catalog: Catalog, onClose: () -> Unit, onOpen: (title: String,
                 Text(
                     "写真はすべて Wikimedia Commons で自由ライセンス(CC0 / パブリックドメイン / CC BY / CC BY-SA)により公開されているものを、" +
                         "縮小して同梱しています。各写真の作者とライセンスは次のとおりです。行をタップすると Commons のファイルページ(原典)を開きます。\n" +
-                        "地球画像: NASA Blue Marble: Next Generation(パブリックドメイン)。解説: Wikipedia 日本語版(CC BY-SA 4.0)。分類・評価: Wikidata(CC0)。",
+                        "地球画像: NASA Blue Marble: Next Generation(パブリックドメイン)。解説・生息環境・脅威: Wikipedia 日本語版・英語版の記事冒頭をもとにした要約(原文・要約とも CC BY-SA 4.0)。分類・評価: Wikidata(CC0)。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),

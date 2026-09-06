@@ -73,6 +73,8 @@ fun FilterSheet(vm: MainViewModel, catalog: Catalog, onDismiss: () -> Unit) {
     }
     fun close() {
         lastToast[0]?.cancel()
+        // 全項目チェック済みの欄は空(絞り込みなし)に戻す。次に開いたとき全解除から始まる。
+        vm.normalizeFilter()
         onDismiss()
     }
 
@@ -128,11 +130,7 @@ fun FilterSheet(vm: MainViewModel, catalog: Catalog, onDismiss: () -> Unit) {
                     val on = g in f.groups
                     FilterChip(
                         selected = on,
-                        onClick = {
-                            val set = f.groups.toMutableSet()
-                            if (on) set.remove(g) else set.add(g)
-                            vm.filter = f.copy(groups = set)
-                        },
+                        onClick = { vm.toggleGroupFilter(g) },
                         label = { Text(g.label) },
                         leadingIcon = { Box(Modifier.size(10.dp).background(g.color, CircleShape)) },
                     )
@@ -146,11 +144,7 @@ fun FilterSheet(vm: MainViewModel, catalog: Catalog, onDismiss: () -> Unit) {
                     val on = i in f.regions
                     FilterChip(
                         selected = on,
-                        onClick = {
-                            val set = f.regions.toMutableSet()
-                            if (on) set.remove(i) else set.add(i)
-                            vm.filter = f.copy(regions = set)
-                        },
+                        onClick = { vm.toggleRegionFilter(i) },
                         label = { Text(rg, style = MaterialTheme.typography.labelMedium) },
                     )
                 }

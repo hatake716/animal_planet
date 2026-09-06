@@ -39,7 +39,7 @@ JSON は `android.util.JsonReader` の手書きパーサのみ使用しており
 ### アプリの内容
 - アプリ名: 地球儀で見る絶滅危惧種生物図鑑
 - カテゴリ: 教育
-- 対象年齢: 全年齢(暴力・性的表現なし)
+- 対象年齢: 全年齢(暴力・性的表現なし)。ただし Play の「対象ユーザー層」は **13 歳以上**にする(YouTube をアプリ内ブラウザで表示するため、13 歳未満を含めると Families ポリシーの対象になる)
 - 有料アプリとして販売する場合は、Play Console の「有料」設定と販売国・価格を設定する。
 
 ### データセーフティ(Data safety)の記入
@@ -52,7 +52,7 @@ JSON は `android.util.JsonReader` の手書きパーサのみ使用しており
 - `docs/PRIVACY.md` の内容を公開 URL(GitHub Pages: `https://hatake716.github.io/animal_planet/PRIVACY`)に置き、その URL を Play Console に登録する。
 
 ### 権限
-- `INTERNET`, `ACCESS_NETWORK_STATE` のみ。いずれも記事・動画・出典ページのアプリ内表示に必要。機微な権限(位置情報・連絡先・カメラ等)は使用しない。
+- `INTERNET` のみ。記事・動画・出典ページのアプリ内表示に必要。機微な権限(位置情報・連絡先・カメラ等)は使用しない。
 
 ### コンテンツの出典(知的財産に関する審査への備え)
 - 写真: Wikimedia Commons の自由ライセンス画像のみ(CC0 / PD / CC BY / CC BY-SA)。作者・ライセンスはアプリ内と `docs/CREDITS.md` に明記。

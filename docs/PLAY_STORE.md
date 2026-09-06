@@ -9,11 +9,11 @@
 | ビルド形式 | 署名済み AAB(`./gradlew bundleRelease`) |
 | バージョン | versionCode 1 / versionName 1.0.0 |
 | 署名 | ローカルのアップロード鍵(`animal-planet-release.jks`、`.gitignore` 済み)|
-| applicationId | `io.github.hatake716.animalplanet`(**公開後は変更不可**。変更するなら初回公開前に) |
+| applicationId | `io.github.hatake716.endangeredglobe`(**公開後は変更不可**。第三者の商標を含まない中立な名前にしている。変更するなら初回公開前に) |
 | compileSdk / targetSdk | 36 |
 | minSdk | 30(Android 11 以上)|
 | R8 縮小・リソース縮小 | 有効 |
-| 権限 | `INTERNET`, `ACCESS_NETWORK_STATE` のみ |
+| 権限 | `INTERNET` のみ |
 
 AAB は `app/build/outputs/bundle/release/app-release.aab`。これを Play Console にアップロードする。
 Play App Signing を使う場合、このローカル鍵は「アップロード鍵」として登録する(**鍵は紛失厳禁**)。
@@ -55,7 +55,7 @@ Play App Signing を使う場合、このローカル鍵は「アップロード
 
 ## コンテンツのレーティング
 
-- 暴力・性的表現・ギャンブル等なし。対象年齢は全年齢。
+- 暴力・性的表現・ギャンブル等なし。コンテンツ自体は全年齢向けだが、**対象ユーザー層は 13 歳以上**を選ぶ(YouTube の検索結果をアプリ内ブラウザで表示するため、13 歳未満を含めると Families ポリシー(子ども向けコンテンツ・広告・外部リンクの制約)の対象になる)。
 - レーティングアンケートでは、ユーザー生成コンテンツ・広告なし、外部リンク(Wikipedia / YouTube / Wikimedia Commons)ありとして回答する。
 
 ## 知的財産・出典
@@ -63,7 +63,7 @@ Play App Signing を使う場合、このローカル鍵は「アップロード
 - 解説: Wikipedia(CC BY-SA 4.0)の記事冒頭の要約。本文は同梱しない。
 - 分類・評価: Wikidata(CC0)。IUCN レッドリストのデータそのものは同梱しない(IUCN のデータは商用利用に制限があるため、Wikidata 経由のカテゴリ値のみ使用)。
 - 地図: NASA Blue Marble(パブリックドメイン)。
-- アプリ名・アイコンは他社の商標を使用していない。リポジトリ名 `animal_planet` に由来する applicationId は他社ブランドと紛らわしい可能性があるため、気になる場合は初回公開前に変更する。
+- アプリ名・アイコンは他社の商標を使用していない。applicationId はリポジトリ名(`animal_planet`)ではなく中立な `io.github.hatake716.endangeredglobe` にしている(「Animal Planet」は同分野の登録商標で、公開後は変更できないため)。
 
 ## 提出前チェック
 
@@ -74,4 +74,6 @@ Play App Signing を使う場合、このローカル鍵は「アップロード
 - [ ] データセーフティを「収集なし・共有なし」で記入
 - [ ] 対象 API レベル(targetSdk 36)が Play の要件を満たすことを確認
 - [ ] 有料アプリの価格・販売国を設定
+- [ ] 対象ユーザー層を 13 歳以上に設定
+- [ ] species.json の種数・写真枚数がストア文言と一致し、`tools/validate.py` が問題 0 件であることを確認
 - [ ] リリーストラック(内部テスト → 製品版)を選んでアップロード

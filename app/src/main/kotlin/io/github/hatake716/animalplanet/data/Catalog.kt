@@ -50,6 +50,18 @@ class Catalog(
 
     fun byId(id: Int): Entry? = byId[id]
 
+    private val indexById: Map<Int, Int> = entries.withIndex().associate { it.value.id to it.index }
+
+    /**
+     * 正規化済みの検索語 [normalizedQuery](normalize 済み)が種 [e] のいずれかのフィールドに含まれるか。
+     * 一覧内検索用: 事前計算した検索キーを使うので、1 文字入力ごとに全件を正規化し直さない。
+     */
+    fun matches(e: Entry, normalizedQuery: String): Boolean {
+        if (normalizedQuery.isEmpty()) return true
+        val i = indexById[e.id] ?: return false
+        return searchKeys[i].contains(normalizedQuery)
+    }
+
     /** 部分一致検索。和名→別名→学名→題名→目・科→地名の順で一致したフィールドと知名度で並べる。 */
     fun search(query: String, limit: Int = 80): List<Entry> {
         val q = normalize(query)

@@ -3,9 +3,9 @@
 各種の写真を Wikimedia Commons から選び、ライセンス情報を取得し、640px のサムネイルを保存する。
 候補の優先順: Wikidata P18 → 日本語版記事の代表画像 → 英語版記事の代表画像 → Commons カテゴリ内の画像(最大 12 枚)。
 採用条件(絶対条件: 第三者利用が自由な素材のみ):
-  - Commons 上の画像で、ライセンスが CC0 / パブリックドメイン / CC BY / CC BY-SA(いずれのバージョンも可)、
-    または Commons の汎用「帰属表示のみ」「制限なし」テンプレート
-  - GFDL のみ・不明・Fair use・非商用(NC)・改変禁止(ND) は不採用
+  - Commons 上の画像で、ライセンスが CC0 / パブリックドメイン / CC BY / CC BY-SA(いずれのバージョンも可)
+  - GFDL のみ・不明・Fair use・非商用(NC)・改変禁止(ND)・汎用テンプレート(Attribution 等)・米国限定 PD は不採用
+  - CC BY / CC BY-SA(帰属表示が必要)で作者が分からない画像は不採用(Own work はアップロード者を作者とする)
   - ラスター画像(jpeg/png/tiff/webp)。svg/gif は不採用
   - 分布図(ファイル名に map / range / distribution / area などを含む)は不採用。写真(JPEG)を PNG より優先する
 入力: wd_species.json, wiki_extracts.json  出力: image_meta.json, images/{qid}.orig(元サムネイル)
@@ -39,7 +39,7 @@ def looks_like_map(filename):
 
 
 def license_ok(short, usage, lic):
-    """(採用可否, 正規化した短い表記)"""
+    """(採用可否, 正規化した短い表記)。CC0 / パブリックドメイン / CC BY / CC BY-SA だけを採用する。"""
     s = (short or "").strip()
     u = (usage or "").lower()
     l = (lic or "").lower()
@@ -55,21 +55,15 @@ def license_ok(short, usage, lic):
     if low in ("cc0", "cc zero") or low.startswith("cc0"):
         return True, "CC0 1.0"
     if "public domain" in low or low.startswith("pd") or "pd-" in l:
+        # 米国内でのみパブリックドメインとされるテンプレート(更新なし・表示なし・1996 年など)は日本向けには使わない
+        if re.search(r"pd-us-(not|no-notice|1996|unpublished|expired-abroad|record)", l) or "in the united states" in u:
+            return False, s
         return True, "Public domain"
     if low.startswith("cc by-sa") or low.startswith("cc-by-sa"):
         return True, s.replace("CC-BY-SA", "CC BY-SA")
     if low.startswith("cc by") or low.startswith("cc-by"):
         return True, s.replace("CC-BY", "CC BY")
-    if low.startswith("gfdl") or "gnu free documentation" in u:
-        # GFDL 単独は不採用(通常は CC BY-SA と併記されており、その場合 short name は CC 側になる)
-        return False, s
-    if "attribution" in u and "share" in u:
-        return True, "CC BY-SA"
-    # Commons の汎用「帰属表示のみ」「制限なし」「著作権付き自由利用」テンプレート(いずれも商用・改変可)
-    if low == "attribution":
-        return True, "Attribution"
-    if low in ("no restrictions", "copyrighted free use", "free use"):
-        return True, s
+    # GFDL 単独、Attribution / No restrictions などの汎用テンプレート、GPL 等は宣言(NOTICE)と揃えるため不採用
     return False, s
 
 
@@ -77,7 +71,7 @@ def imageinfo(files):
     d = get_json(COMMONS, {
         "action": "query", "format": "json", "formatversion": 2,
         "titles": "|".join("File:" + f for f in files),
-        "prop": "imageinfo", "iiprop": "extmetadata|url|size|mime", "iiurlwidth": 640,
+        "prop": "imageinfo", "iiprop": "extmetadata|url|size|mime|user", "iiurlwidth": 640,
         "iiextmetadatafilter": FIELDS,
     })
     out = {}
@@ -96,13 +90,29 @@ def imageinfo(files):
         em = {k: v.get("value", "") for k, v in ii.get("extmetadata", {}).items()}
         ok, lic = license_ok(em.get("LicenseShortName"), em.get("UsageTerms"), em.get("License"))
         name = t[5:]
+        artist = strip_tags(em.get("Artist", ""))
+        credit = strip_tags(em.get("Credit", ""))
+        uploader = ii.get("user", "")
+        # 作者が空のとき: 「Own work」ならアップロード者が作者。それ以外は Credit(出典)欄で代用する。
+        if not artist:
+            if uploader and re.search(r"own work|自身の作品|eigenes werk|travail personnel|obra propia", credit, re.I):
+                artist = uploader
+            elif credit and credit.lower() not in ("own work",):
+                artist = credit
+        if len(artist) > 300:
+            print(f"  long artist truncated: {name} ({len(artist)} chars)", file=sys.stderr)
+            artist = artist[:300]
+        attribution_required = lic not in ("CC0 1.0", "Public domain")
         out[f] = {
             "file": name, "mime": ii.get("mime", ""), "width": ii.get("width", 0), "height": ii.get("height", 0),
             "thumb": ii.get("thumburl", ""), "descUrl": ii.get("descriptionurl", ""),
-            "artist": strip_tags(em.get("Artist", ""))[:120], "credit": strip_tags(em.get("Credit", ""))[:120],
+            "artist": artist, "credit": credit[:200], "uploader": uploader,
             "licenseShort": em.get("LicenseShortName", ""), "license": lic, "licenseUrl": em.get("LicenseUrl", ""),
+            "licenseTemplate": em.get("License", ""),
             "usageTerms": em.get("UsageTerms", ""), "restrictions": em.get("Restrictions", ""),
-            "ok": ok and ii.get("mime", "") in OK_MIME and bool(ii.get("thumburl")) and not looks_like_map(name),
+            # 帰属表示が必要なライセンスで作者が分からない写真は採用しない
+            "ok": ok and ii.get("mime", "") in OK_MIME and bool(ii.get("thumburl")) and not looks_like_map(name)
+                and (artist != "" or not attribution_required),
             "map": looks_like_map(name),
         }
     return out
@@ -150,7 +160,7 @@ def main():
         cands[s["qid"]] = [x.replace("_", " ") for x in c]
 
     def fetch_info(files):
-        need = sorted({f for f in files if f not in info})
+        need = sorted({f for f in files if f not in info or (info[f] is not None and "uploader" not in info[f])})
         batches = list(chunks(need, 40))
         for i, res in enumerate(pmap(imageinfo, batches, workers=3)):
             info.update(res)

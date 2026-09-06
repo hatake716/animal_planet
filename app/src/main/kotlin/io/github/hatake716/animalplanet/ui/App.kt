@@ -401,7 +401,12 @@ private fun BoxScope.GlobeScreen(vm: MainViewModel) {
         CreditsScreen(catalog = catalog, onClose = { vm.showCredits = false }, onOpen = { t, u -> vm.openUrl(t, u) })
     }
     if (vm.showAbout) {
-        AboutDialog(catalog = catalog, onDismiss = { vm.showAbout = false }, onCredits = { vm.showAbout = false; vm.showCredits = true })
+        AboutDialog(
+            catalog = catalog,
+            onDismiss = { vm.showAbout = false },
+            onCredits = { vm.showAbout = false; vm.showCredits = true },
+            onPrivacy = { vm.showAbout = false; vm.openUrl("プライバシーポリシー", PRIVACY_POLICY_URL) },
+        )
     }
 
     // 選択が変わったら地球儀側にも反映(検索/一覧以外からの選択時はカメラを動かさない)

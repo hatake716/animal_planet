@@ -1,18 +1,19 @@
-# Google Play 提出手順書(v1.0.1)
+# Google Play 提出手順書(v1.0.2)
 
 このフォルダ(`docs/play/`)に、Play Console に入力・アップロードするものを一式まとめています。
-AAB / APK / mapping は Git に含めず、`dist/play-v1.0.1/`(ローカル)と GitHub Release の添付にあります。
+AAB / APK / mapping は Git に含めず、`dist/play-v1.0.2/`(ローカル)と GitHub Release の添付にあります。
+Play の要件との照合結果は [`POLICY_CHECK.md`](POLICY_CHECK.md) にあります。
 
 | 用途 | ファイル |
 |---|---|
-| アプリ本体(Play にアップロード) | `dist/play-v1.0.1/animal_planet-v1.0.1.aab`(署名済み、約 92MB)／ [Release v1.0.1](https://github.com/hatake716/animal_planet/releases/tag/v1.0.1) |
-| 難読化マッピング(クラッシュ解析用、任意) | `dist/play-v1.0.1/mapping-v1.0.1.txt` |
-| 動作確認用 APK | `dist/play-v1.0.1/animal_planet-v1.0.1.apk` |
+| アプリ本体(Play にアップロード) | `dist/play-v1.0.2/animal_planet-v1.0.2.aab`(署名済み、約 92MB)／ [Release v1.0.2](https://github.com/hatake716/animal_planet/releases/tag/v1.0.2) |
+| 難読化マッピング(クラッシュ解析用、任意) | `dist/play-v1.0.2/mapping-v1.0.2.txt` |
+| 動作確認用 APK | `dist/play-v1.0.2/animal_planet-v1.0.2.apk` |
 | ストア掲載文(アプリ名・簡単な説明・詳しい説明・新機能) | [`LISTING.md`](LISTING.md) |
 | 申告フォームの回答(データセーフティ・コンテンツレーティング・アプリのコンテンツ) | [`FORMS.md`](FORMS.md) |
 | アプリアイコン 512×512 | `icon_512.png` |
 | フィーチャーグラフィック 1024×500 | `feature_1024x500.png` |
-| スマートフォン用スクリーンショット 1080×2160(7 枚) | `screenshots/01_globe.png` 〜 `07_filtered.png` |
+| スマートフォン用スクリーンショット 1080×2160、24-bit PNG(7 枚) | `screenshots/01_globe.png` 〜 `07_filtered.png` |
 | プライバシーポリシー URL | https://hatake716.github.io/animal_planet/PRIVACY/ |
 | 出典・ライセンス(審査での問い合わせに備えて) | [`../../NOTICE.md`](../../NOTICE.md)、[`../CREDITS.md`](../CREDITS.md) |
 
@@ -39,6 +40,7 @@ Play Console の設問と回答は [`FORMS.md`](FORMS.md) の順番どおり。�
 - 政府アプリ: いいえ。金融機能: なし。健康: 該当なし。
 - アプリのカテゴリ: **教育**。タグは任意(教育、参考資料、動物 など)。
 - 連絡先: デベロッパーのメールアドレス(Play Console に登録したもの)。
+- プライバシーポリシーはアプリ内(「このアプリについて → プライバシーポリシーを開く」)からも参照できる(Play の User Data ポリシーの要件)。
 
 ## 4. ストアの設定(メインのストアの掲載情報)
 
@@ -51,9 +53,10 @@ Play Console の設問と回答は [`FORMS.md`](FORMS.md) の順番どおり。�
 
 1. 「テスト → 内部テスト」で新しいリリースを作成し、AAB をアップロード。リリースノートは LISTING.md の「新機能」。
 2. 内部テストのテスターとして自分の Google アカウントを追加し、Play 経由でインストールして動作確認(R8 縮小版で地球儀・検索・絞り込み・詳細・写真・Wikipedia・動画)。
-3. 「製品版」を作成して同じ AAB を昇格(または再アップロード)。国/地域を選択(日本、必要なら全世界)。
-4. 「収益化 → 商品 → アプリの価格」で価格を設定(国ごとの価格は自動換算または個別設定)。
-5. 審査に送信。初回審査は数日かかることがある。
+3. **2023 年 11 月 13 日以降に作成した個人のデベロッパーアカウント**の場合、製品版へのアクセスを申請する前に「クローズドテスト」でテスター 12 人以上が 14 日間連続でオプトインしている必要がある。該当する場合は「テスト → クローズドテスト」で同じ AAB を配布し、期間中に価格・販売国・ストア掲載情報を仕上げてから製品版アクセスを申請する(有料アプリでもテスターは無料で入手できる)。
+4. 「製品版」を作成して同じ AAB を昇格(または再アップロード)。国/地域を選択(日本、必要なら全世界)。
+5. 「収益化 → 商品 → アプリの価格」で価格を設定(国ごとの価格は自動換算または個別設定)。
+6. 審査に送信。初回審査は数日かかることがある。
 
 ## 6. 審査で聞かれやすい点への備え
 

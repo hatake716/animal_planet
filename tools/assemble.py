@@ -100,16 +100,6 @@ def main():
             mask |= 1 << r
         if mask == 0:
             print(f"  no region {it['id']} {it['name']}", file=sys.stderr)
-        m = imgs.get(it["qid"])
-        img_file = author = lic = lic_url = ""
-        if m and m.get("ok") and os.path.exists(f"images/{it['qid']}.orig"):
-            dst = os.path.join(assets, "img", f"{it['id']}.jpg")
-            if convert_image(f"images/{it['qid']}.orig", dst):
-                img_file = m["file"]
-                author = m.get("artist") or ""
-                lic = m.get("license") or m.get("licenseShort") or ""
-                lic_url = m.get("licenseUrl") or ""
-                credits.append({"id": it["id"], "name": name, "file": img_file, "author": author, "license": lic, "licenseUrl": lic_url, "url": m.get("descUrl", "")})
         yomi = e.get("yomi") or ""
         order_ja = fix_rank_suffix((e.get("orderJa") or "").strip() or it["orderJa"], "目")
         family_ja = fix_rank_suffix((e.get("familyJa") or "").strip() or it["familyJa"], "科")
@@ -122,6 +112,16 @@ def main():
             name = it["jaTitle"]
             if yomi == "" or yomi == it["name"]:
                 yomi = ""
+        m = imgs.get(it["qid"])
+        img_file = author = lic = lic_url = ""
+        if m and m.get("ok") and os.path.exists(f"images/{it['qid']}.orig"):
+            dst = os.path.join(assets, "img", f"{it['id']}.jpg")
+            if convert_image(f"images/{it['qid']}.orig", dst):
+                img_file = m["file"]
+                author = m.get("artist") or ""
+                lic = m.get("license") or m.get("licenseShort") or ""
+                lic_url = m.get("licenseUrl") or ""
+                credits.append({"id": it["id"], "name": name, "file": img_file, "author": author, "license": lic, "licenseUrl": lic_url, "url": m.get("descUrl", "")})
         row = [
             it["id"], name, "|".join(aliases), it["sci"], it["jaTitle"], it["enTitle"] or "",
             round(lat, 4), round(lon, 4), (e.get("place") or "")[:30],

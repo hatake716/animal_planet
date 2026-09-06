@@ -8,7 +8,7 @@
 | 項目 | 状態 |
 |---|---|
 | ビルド形式 | 署名済み AAB(`./gradlew bundleRelease`) |
-| バージョン | versionCode 2 / versionName 1.0.1 |
+| バージョン | versionCode 3 / versionName 1.0.2 |
 | 署名 | ローカルのアップロード鍵(`animal-planet-release.jks`、`.gitignore` 済み)|
 | applicationId | `io.github.hatake716.endangeredglobe`(**公開後は変更不可**。第三者の商標を含まない中立な名前にしている。変更するなら初回公開前に) |
 | compileSdk / targetSdk | 36 |
@@ -77,4 +77,4 @@ Play App Signing を使う場合、このローカル鍵は「アップロード
 - [ ] 有料アプリの価格・販売国を設定
 - [ ] 対象ユーザー層を 13 歳以上に設定
 - [ ] species.json の種数・写真枚数がストア文言と一致し、`tools/validate.py` が問題 0 件であることを確認
-- [ ] リリーストラック(内部テスト → 製品版)を選んでアップロード
+- [ ] リリーストラック(内部テスト → 必要ならクローズドテスト(新規個人アカウントはテスター 12 人・14 日間が必須)→ 製品版)を選んでアップロード

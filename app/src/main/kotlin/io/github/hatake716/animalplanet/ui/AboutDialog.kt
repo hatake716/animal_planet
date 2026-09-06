@@ -1,6 +1,7 @@
 package io.github.hatake716.animalplanet.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
@@ -17,8 +18,11 @@ import io.github.hatake716.animalplanet.BuildConfig
 import io.github.hatake716.animalplanet.data.Catalog
 import io.github.hatake716.animalplanet.data.RedListStatus
 
+/** 公開しているプライバシーポリシー(GitHub Pages)。Play のポリシーでアプリ内からも参照できる必要がある。 */
+const val PRIVACY_POLICY_URL = "https://hatake716.github.io/animal_planet/PRIVACY/"
+
 @Composable
-fun AboutDialog(catalog: Catalog, onDismiss: () -> Unit, onCredits: () -> Unit) {
+fun AboutDialog(catalog: Catalog, onDismiss: () -> Unit, onCredits: () -> Unit, onPrivacy: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
@@ -61,6 +65,10 @@ fun AboutDialog(catalog: Catalog, onDismiss: () -> Unit, onCredits: () -> Unit) 
                 Spacer(Modifier.height(12.dp))
                 Text("ライセンス", fontWeight = FontWeight.Bold)
                 Text("アプリ本体: MIT License\nソースコード: github.com/hatake716/animal_planet", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(12.dp))
+                Text("プライバシー", fontWeight = FontWeight.Bold)
+                Text("個人情報を収集・送信しません。既読・ブックマークは端末内にのみ保存されます。", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onPrivacy, contentPadding = PaddingValues(0.dp)) { Text("プライバシーポリシーを開く") }
             }
         },
     )

@@ -282,10 +282,12 @@ private fun BoxScope.GlobeScreen(vm: MainViewModel) {
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(start = 84.dp, end = 12.dp, bottom = 6.dp),
         ) {
             Text(
-                "写真: Wikimedia Commons ／ 解説: Wikipedia ／ 評価: Wikidata ／ 地図: NASA",
+                "写真: Wikimedia Commons ／ 解説: Wikipedia ／ 地図: NASA",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f),
                 fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

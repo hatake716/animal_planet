@@ -98,17 +98,22 @@ def main():
                 lic_url = m.get("licenseUrl") or ""
                 credits.append({"id": it["id"], "name": it["name"], "file": img_file, "author": author, "license": lic, "licenseUrl": lic_url, "url": m.get("descUrl", "")})
         yomi = e.get("yomi") or ""
+        order_ja = (e.get("orderJa") or "").strip() or it["orderJa"]
+        family_ja = (e.get("familyJa") or "").strip() or it["familyJa"]
         row = [
             it["id"], it["name"], "|".join(it["aliases"]), it["sci"], it["jaTitle"], it["enTitle"] or "",
             round(lat, 4), round(lon, 4), (e.get("place") or "")[:30],
             GROUP_CODE[it["group"]], it["status"], mask, int(e.get("importance") or 1),
             (e.get("desc") or "").strip(), (e.get("habitat") or "").strip(), (e.get("threats") or "").strip(),
-            it["orderJa"], it["familyJa"], img_file, author, lic, lic_url,
+            order_ja, family_ja, img_file, author, lic, lic_url,
         ]
         if yomi and yomi != it["name"]:
             row.append(yomi)
         entries.append(row)
-    save(os.path.join(assets, "species.json"), {"regions": REGIONS, "entries": entries})
+    # アプリ同梱用はコンパクトに書く(インデントなし)
+    import json
+    with open(os.path.join(assets, "species.json"), "w", encoding="utf-8") as f:
+        json.dump({"regions": REGIONS, "entries": entries}, f, ensure_ascii=False, separators=(",", ":"))
     save("credits.json", credits)
     print(f"written {len(entries)} entries ({len(credits)} with photo); missing: {len(missing)} {missing[:20]}; skipped: {skipped}")
 

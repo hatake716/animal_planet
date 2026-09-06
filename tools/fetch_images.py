@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 各種の写真を Wikimedia Commons から選び、ライセンス情報を取得し、640px のサムネイルを保存する。
-候補の優先順: Wikidata P18 → 日本語版記事の代表画像 → 英語版記事の代表画像 → Commons カテゴリ内の画像。
+候補の優先順: Wikidata P18 → 日本語版記事の代表画像 → 英語版記事の代表画像 → Commons カテゴリ内の画像(最大 12 枚)。
 採用条件(絶対条件: 第三者利用が自由な素材のみ):
-  - Commons 上の画像で、ライセンスが CC0 / パブリックドメイン / CC BY / CC BY-SA (いずれのバージョンも可)
+  - Commons 上の画像で、ライセンスが CC0 / パブリックドメイン / CC BY / CC BY-SA(いずれのバージョンも可)、
+    または Commons の汎用「帰属表示のみ」「制限なし」テンプレート
   - GFDL のみ・不明・Fair use・非商用(NC)・改変禁止(ND) は不採用
   - ラスター画像(jpeg/png/tiff/webp)。svg/gif は不採用
-入力: wd_species.json, wiki_extracts.json  出力: image_meta.json, images/{qid}.jpg(元サムネイル)
+  - 分布図(ファイル名に map / range / distribution / area などを含む)は不採用。写真(JPEG)を PNG より優先する
+入力: wd_species.json, wiki_extracts.json  出力: image_meta.json, images/{qid}.orig(元サムネイル)
+imageinfo の結果は imageinfo_cache.json にキャッシュし、再実行時は未取得分だけ問い合わせる。
 """
 import html
 import os
@@ -17,6 +20,11 @@ from common import get, get_json, load, save, pmap, chunks
 COMMONS = "https://commons.wikimedia.org/w/api.php"
 OK_MIME = {"image/jpeg", "image/png", "image/tiff", "image/webp"}
 FIELDS = "LicenseShortName|License|Artist|Credit|UsageTerms|AttributionRequired|Copyrighted|Restrictions|LicenseUrl|ImageDescription"
+MAP_PAT = re.compile(
+    r"(map|range|distribution|distribu|verbreitung|\barea\b|habitat|locator|karte|\bmapa\b|carte|\bdist\b|distmap|"
+    r"występowanie|分布|区域|areal|localis|location|\bloc\b|\bareas\b|\brange\b)",
+    re.I,
+)
 
 
 def strip_tags(s):
@@ -24,6 +32,10 @@ def strip_tags(s):
     s = re.sub(r"<[^>]+>", "", s)
     s = html.unescape(s)
     return re.sub(r"\s+", " ", s).strip()
+
+
+def looks_like_map(filename):
+    return bool(MAP_PAT.search(filename))
 
 
 def license_ok(short, usage, lic):
@@ -53,6 +65,11 @@ def license_ok(short, usage, lic):
         return False, s
     if "attribution" in u and "share" in u:
         return True, "CC BY-SA"
+    # Commons の汎用「帰属表示のみ」「制限なし」「著作権付き自由利用」テンプレート(いずれも商用・改変可)
+    if low == "attribution":
+        return True, "Attribution"
+    if low in ("no restrictions", "copyrighted free use", "free use"):
+        return True, s
     return False, s
 
 
@@ -78,37 +95,51 @@ def imageinfo(files):
         ii = p["imageinfo"][0]
         em = {k: v.get("value", "") for k, v in ii.get("extmetadata", {}).items()}
         ok, lic = license_ok(em.get("LicenseShortName"), em.get("UsageTerms"), em.get("License"))
+        name = t[5:]
         out[f] = {
-            "file": t[5:], "mime": ii.get("mime", ""), "width": ii.get("width", 0), "height": ii.get("height", 0),
+            "file": name, "mime": ii.get("mime", ""), "width": ii.get("width", 0), "height": ii.get("height", 0),
             "thumb": ii.get("thumburl", ""), "descUrl": ii.get("descriptionurl", ""),
             "artist": strip_tags(em.get("Artist", ""))[:120], "credit": strip_tags(em.get("Credit", ""))[:120],
             "licenseShort": em.get("LicenseShortName", ""), "license": lic, "licenseUrl": em.get("LicenseUrl", ""),
             "usageTerms": em.get("UsageTerms", ""), "restrictions": em.get("Restrictions", ""),
-            "ok": ok and ii.get("mime", "") in OK_MIME and bool(ii.get("thumburl")),
+            "ok": ok and ii.get("mime", "") in OK_MIME and bool(ii.get("thumburl")) and not looks_like_map(name),
+            "map": looks_like_map(name),
         }
     return out
 
 
-def category_files(cat, limit=8):
+def category_files(cat, limit=12):
     d = get_json(COMMONS, {
         "action": "query", "format": "json", "formatversion": 2, "list": "categorymembers",
-        "cmtitle": "Category:" + cat, "cmtype": "file", "cmlimit": limit,
+        "cmtitle": "Category:" + cat, "cmtype": "file", "cmlimit": 40,
     })
     if not d:
         return []
-    return [m["title"][5:] for m in d.get("query", {}).get("categorymembers", []) if m["title"].lower().endswith((".jpg", ".jpeg", ".png"))]
+    names = [m["title"][5:] for m in d.get("query", {}).get("categorymembers", [])]
+    names = [n for n in names if n.lower().endswith((".jpg", ".jpeg", ".png")) and not looks_like_map(n)]
+    # 写真らしい JPEG を先に
+    names.sort(key=lambda n: 0 if n.lower().endswith((".jpg", ".jpeg")) else 1)
+    return names[:limit]
+
+
+def choose(cands, info):
+    """候補(優先順)から採用可能な最初の画像。JPEG を PNG より優先する。"""
+    usable = [info[f] for f in cands if info.get(f) and info[f]["ok"]]
+    if not usable:
+        return None
+    jpeg = [m for m in usable if m["mime"] == "image/jpeg"]
+    return (jpeg or usable)[0]
 
 
 def main():
     species = load("wd_species.json")
     extracts = load("wiki_extracts.json", {})
     meta = load("image_meta.json", {})
+    info = load("imageinfo_cache.json", {})
     os.makedirs("images", exist_ok=True)
-    # 候補ファイル名の列挙
+    # 1. 候補ファイル名(P18 → ja pageimage → en pageimage)
     cands = {}
     for s in species:
-        if s["qid"] in meta and meta[s["qid"]] is not None and meta[s["qid"]].get("ok"):
-            continue
         c = []
         if s["img"]:
             c.append(s["img"])
@@ -117,40 +148,40 @@ def main():
             if pi and pi not in c:
                 c.append(pi)
         cands[s["qid"]] = [x.replace("_", " ") for x in c]
-    print(f"species needing image: {len(cands)}")
-    # 1. まとめて imageinfo
-    allfiles = sorted({f for c in cands.values() for f in c})
-    info = {}
-    batches = list(chunks(allfiles, 40))
-    for i, res in enumerate(pmap(imageinfo, batches, workers=3)):
-        info.update(res)
-        if i % 10 == 0:
-            print(f"  imageinfo {i + 1}/{len(batches)}")
-    chosen = {}
-    need_cat = []
+
+    def fetch_info(files):
+        need = sorted({f for f in files if f not in info})
+        batches = list(chunks(need, 40))
+        for i, res in enumerate(pmap(imageinfo, batches, workers=3)):
+            info.update(res)
+            if i % 10 == 0:
+                save("imageinfo_cache.json", info)
+        save("imageinfo_cache.json", info)
+
+    fetch_info([f for c in cands.values() for f in c])
+    # 2. 直接候補で JPEG の写真が取れない種は Commons カテゴリからも探す
+    weak = [s for s in species if s["commonsCat"] and (lambda m: m is None or m["mime"] != "image/jpeg")(choose(cands[s["qid"]], info))]
+    print(f"looking into commons category: {len(weak)}")
+    catfiles = pmap(lambda s: category_files(s["commonsCat"]), weak, workers=3)
+    for s, fs in zip(weak, catfiles):
+        for f in fs:
+            if f not in cands[s["qid"]]:
+                cands[s["qid"]].append(f)
+    fetch_info([f for c in cands.values() for f in c])
+    # 3. 選定
+    changed = 0
     for s in species:
-        q = s["qid"]
-        if q not in cands:
-            continue
-        pick = next((info[f] for f in cands[q] if info.get(f) and info[f]["ok"]), None)
-        if pick:
-            chosen[q] = pick
-        elif s["commonsCat"]:
-            need_cat.append(s)
-        else:
-            chosen[q] = None
-    # 2. カテゴリから探す
-    print(f"fallback to commons category: {len(need_cat)}")
-    catfiles = pmap(lambda s: category_files(s["commonsCat"]), need_cat, workers=3)
-    extra = sorted({f for fs in catfiles for f in fs})
-    for res in pmap(imageinfo, list(chunks(extra, 40)), workers=3):
-        info.update(res)
-    for s, fs in zip(need_cat, catfiles):
-        pick = next((info[f] for f in fs if info.get(f) and info[f]["ok"]), None)
-        chosen[s["qid"]] = pick
-    meta.update(chosen)
+        pick = choose(cands[s["qid"]], info)
+        old = meta.get(s["qid"])
+        if (pick or {}).get("file") != (old or {}).get("file"):
+            changed += 1
+            p = f"images/{s['qid']}.orig"
+            if os.path.exists(p):
+                os.remove(p)
+        meta[s["qid"]] = pick
     save("image_meta.json", meta)
-    # 3. サムネイルのダウンロード
+    print(f"changed selections: {changed}")
+    # 4. サムネイルのダウンロード(未取得分のみ)
     dl = [(q, m) for q, m in meta.items() if m and m.get("ok") and not os.path.exists(f"images/{q}.orig")]
     print(f"download: {len(dl)}")
 
@@ -167,13 +198,12 @@ def main():
             f.write(data)
         return True
 
-    done = sum(1 for ok in pmap(fetch_one, dl, workers=4) if ok)
-    rej = {}
-    for f, m in info.items():
-        if m and not m["ok"]:
-            rej[m["licenseShort"] or m["mime"]] = rej.get(m["licenseShort"] or m["mime"], 0) + 1
-    print(f"downloaded {done}. species with image: {sum(1 for q in meta if meta[q])}/{len(species)}")
-    print("rejected licenses/mimes:", sorted(rej.items(), key=lambda x: -x[1])[:15])
+    done = sum(1 for ok in pmap(fetch_one, dl, workers=3) if ok)
+    n_img = sum(1 for q in meta if meta[q])
+    n_png = sum(1 for q in meta if meta[q] and meta[q]["mime"] == "image/png")
+    print(f"downloaded {done}. species with image: {n_img}/{len(species)} (png: {n_png})")
+    no_img = [s["name"] for s in species if not meta.get(s["qid"])]
+    print("without image:", len(no_img), no_img[:40])
 
 
 if __name__ == "__main__":

@@ -58,7 +58,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val userData = UserDataRepository(app)
 
-    var detailExpanded by mutableStateOf(false)
+    /** 詳細カードの展開状態。ピンをタップした時点で詳細(写真・解説・生息環境・脅威)を全部見せる。 */
+    var detailExpanded by mutableStateOf(true)
 
     /** カメラの復元用(度、高度)。 */
     var savedLat = 20.0
@@ -99,14 +100,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun select(id: Int) {
         selectedId = id
-        detailExpanded = false
+        detailExpanded = true
         // 詳細を開いた(地球儀・一覧・検索いずれからでも)時点で既読にする
         if (id >= 0 && id !in readIds) viewModelScope.launch { userData.markRead(id) }
     }
 
     fun clearSelection() {
         selectedId = -1
-        detailExpanded = false
+        detailExpanded = true
     }
 
     fun updateQuery(q: String) {

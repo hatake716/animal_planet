@@ -162,18 +162,17 @@ class MarkerLayer(private val entries: List<Entry>, private val density: Float) 
         labelRects.clear()
         markerCount = 0
         var snapCount = 0
-        val eye = camera.eyeInEarth
         val sel = selectedId
         // まず表示対象を投影(優先順に走査するので vis 配列は優先順に並ぶ)
         var vis = 0
-        val limbMargin = 0.02
         for (pi in 0 until n) {
             val i = priorityOrder[pi]
             // 絞り込みで除外中でも、選択中の種(検索・一覧から選んだもの)は必ず描く
             if (!enabled[i] && entries[i].id != sel) continue
             val x = px[i]; val y = py[i]; val z = pz[i]
-            // 地平線の少し内側までを表示
-            if ((eye[0] - x) * x + (eye[1] - y) * y + (eye[2] - z) * z <= limbMargin) continue
+            // 高度によらず、実際に地平線より手前にある点を表示する。
+            // 固定の正の余白は低高度(最大拡大時)で画面中央のピンまで除外してしまう。
+            if (!camera.isFrontFacing(x, y, z)) continue
             if (!camera.project(x, y, z, tmp)) continue
             var sx = tmp[0]; var sy = tmp[1]
             if (spread && groupSize[i] > 1) {

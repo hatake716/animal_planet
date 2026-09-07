@@ -26,8 +26,8 @@ android {
         applicationId = "io.github.hatake716.endangeredglobe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
     }
 
     // 地球テクスチャ・写真(JPEG)は既に圧縮済みなので aapt の再圧縮を避ける

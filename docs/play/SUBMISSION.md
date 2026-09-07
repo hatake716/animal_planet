@@ -1,14 +1,14 @@
-# Google Play 提出手順書(v1.0.2)
+# Google Play 提出手順書(v1.0.3)
 
 このフォルダ(`docs/play/`)に、Play Console に入力・アップロードするものを一式まとめています。
-AAB / APK / mapping は Git に含めず、`dist/play-v1.0.2/`(ローカル)と GitHub Release の添付にあります。
+AAB / APK / mapping は Git に含めず、`dist/play-v1.0.3/`(ローカル)と GitHub Release の添付にあります。
 Play の要件との照合結果は [`POLICY_CHECK.md`](POLICY_CHECK.md) にあります。
 
 | 用途 | ファイル |
 |---|---|
-| アプリ本体(Play にアップロード) | `dist/play-v1.0.2/animal_planet-v1.0.2.aab`(署名済み、約 92MB)／ [Release v1.0.2](https://github.com/hatake716/animal_planet/releases/tag/v1.0.2) |
-| 難読化マッピング(クラッシュ解析用、任意) | `dist/play-v1.0.2/mapping-v1.0.2.txt` |
-| 動作確認用 APK | `dist/play-v1.0.2/animal_planet-v1.0.2.apk` |
+| アプリ本体(Play にアップロード) | `dist/play-v1.0.3/animal_planet-v1.0.3.aab`(署名済み、約 92MB)／ [Release v1.0.3](https://github.com/hatake716/animal_planet/releases/tag/v1.0.3) |
+| 難読化マッピング(クラッシュ解析用、任意) | `dist/play-v1.0.3/mapping-v1.0.3.txt` |
+| 動作確認用 APK | `dist/play-v1.0.3/animal_planet-v1.0.3.apk` |
 | ストア掲載文(アプリ名・簡単な説明・詳しい説明・新機能) | [`LISTING.md`](LISTING.md) |
 | 申告フォームの回答(データセーフティ・コンテンツレーティング・アプリのコンテンツ) | [`FORMS.md`](FORMS.md) |
 | アプリアイコン 512×512 | `icon_512.png` |

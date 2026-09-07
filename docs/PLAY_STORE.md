@@ -8,7 +8,7 @@
 | 項目 | 状態 |
 |---|---|
 | ビルド形式 | 署名済み AAB(`./gradlew bundleRelease`) |
-| バージョン | versionCode 3 / versionName 1.0.2 |
+| バージョン | versionCode 4 / versionName 1.0.3 |
 | 署名 | ローカルのアップロード鍵(`animal-planet-release.jks`、`.gitignore` 済み)|
 | applicationId | `io.github.hatake716.endangeredglobe`(**公開後は変更不可**。第三者の商標を含まない中立な名前にしている。変更するなら初回公開前に) |
 | compileSdk / targetSdk | 36 |

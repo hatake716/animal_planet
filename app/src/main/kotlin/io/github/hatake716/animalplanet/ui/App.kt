@@ -127,11 +127,11 @@ private fun BoxScope.GlobeScreen(vm: MainViewModel) {
                         else -> vm.pickCandidates = ids.mapNotNull { catalog.byId(it) }
                     }
                 },
-                onCameraIdle = { lat, lon, alt ->
-                    vm.saveCamera(Math.toDegrees(lat), Math.toDegrees(lon), alt)
+                onCameraIdle = { lat, lon, alt, rotation ->
+                    vm.saveCamera(Math.toDegrees(lat), Math.toDegrees(lon), alt, rotation)
                 },
             ).also {
-                it.setCamera(vm.savedLat, vm.savedLon, vm.savedAlt)
+                it.setCamera(vm.savedLat, vm.savedLon, vm.savedAlt, vm.savedRotation)
                 globe = it
             }
         },

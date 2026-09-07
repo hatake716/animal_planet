@@ -8,7 +8,6 @@ import android.view.MotionEvent
 import io.github.hatake716.animalplanet.data.Entry
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 
@@ -21,20 +20,19 @@ class GlobeView(
     context: Context,
     entries: List<Entry>,
     private val onTap: (ids: List<Int>) -> Unit,
-    onCameraIdle: (lat: Double, lon: Double, alt: Double) -> Unit,
+    onCameraIdle: (lat: Double, lon: Double, alt: Double, rotation: Rotation) -> Unit,
 ) : GLSurfaceView(context) {
 
     val renderer: GlobeRenderer
     private val density = resources.displayMetrics.density
 
     private var mode = Mode.NONE
-    // grab / velocity は UI スレッドと GL スレッド(queueEvent)の両方から触るため可視性を確保する
-    @Volatile private var grab: DoubleArray? = null
+    // 掴んだ地表・角速度は GL スレッドだけで更新。UP も MOVE の後にキューで処理する。
+    private var grab: DoubleArray? = null
     private var lastX = 0f
     private var lastY = 0f
     private var lastTime = 0L
-    @Volatile private var velLat = 0.0
-    @Volatile private var velLon = 0.0
+    private val velocity = DoubleArray(3)
     private var pinchDist = 0f
     private var pinchFocalX = 0f
     private var pinchFocalY = 0f
@@ -53,10 +51,10 @@ class GlobeView(
             val sy = e.y
             queueEvent {
                 renderer.camera.update()
-                val ll = renderer.camera.screenToLatLon(sx, sy)
+                val point = renderer.camera.surfacePoint(sx, sy)
                 val cam = renderer.camera
-                if (ll != null) renderer.flyTo(ll[0], ll[1], cam.altitude / 2.5, 550)
-                else renderer.flyTo(cam.centerLat, cam.centerLon, cam.altitude / 2.5, 550)
+                if (point != null) renderer.focusOn(point, cam.altitude / 2.5, 550)
+                else renderer.zoomTo(cam.altitude / 2.5, 550)
             }
             requestRender()
             return true
@@ -84,11 +82,10 @@ class GlobeView(
     }
 
     /** altitude <= 0 なら地球全体が収まる高度にする。 */
-    fun setCamera(latDeg: Double, lonDeg: Double, altitude: Double) {
+    fun setCamera(latDeg: Double, lonDeg: Double, altitude: Double, rotation: Rotation? = null) {
         queueEvent {
             renderer.stopAnimations()
-            renderer.camera.centerLat = Math.toRadians(latDeg)
-            renderer.camera.centerLon = Math.toRadians(lonDeg)
+            renderer.camera.rotation = rotation ?: Rotation.northUp(Math.toRadians(latDeg), Math.toRadians(lonDeg))
             if (altitude > 0) {
                 renderer.camera.altitude = altitude
                 renderer.pendingFit = false
@@ -106,7 +103,7 @@ class GlobeView(
     fun fitWorld() {
         queueEvent {
             val cam = renderer.camera
-            renderer.flyTo(cam.centerLat, cam.centerLon, cam.fitAltitude(), 900)
+            renderer.zoomTo(cam.fitAltitude(), 900)
         }
         requestRender()
     }
@@ -114,7 +111,7 @@ class GlobeView(
     fun zoomBy(factor: Double) {
         queueEvent {
             val cam = renderer.camera
-            renderer.flyTo(cam.centerLat, cam.centerLon, cam.altitude / factor, 350)
+            renderer.zoomTo(cam.altitude / factor, 350)
         }
         requestRender()
     }
@@ -156,14 +153,13 @@ class GlobeView(
                 lastX = event.x
                 lastY = event.y
                 lastTime = event.eventTime
-                velLat = 0.0
-                velLon = 0.0
                 val sx = event.x
                 val sy = event.y
                 queueEvent {
                     renderer.stopAnimations()
+                    velocity.fill(0.0)
                     renderer.camera.update()
-                    grab = renderer.camera.screenToLatLon(sx, sy)
+                    grab = renderer.camera.surfacePoint(sx, sy)
                 }
                 requestRender()
             }
@@ -173,13 +169,12 @@ class GlobeView(
                     pinchDist = dist(event)
                     pinchFocalX = (event.getX(0) + event.getX(1)) / 2
                     pinchFocalY = (event.getY(0) + event.getY(1)) / 2
-                    velLat = 0.0
-                    velLon = 0.0
                     val fx = pinchFocalX
                     val fy = pinchFocalY
                     queueEvent {
+                        velocity.fill(0.0)
                         renderer.camera.update()
-                        grab = renderer.camera.screenToLatLon(fx, fy)
+                        grab = renderer.camera.surfacePoint(fx, fy)
                     }
                 }
             }
@@ -216,24 +211,22 @@ class GlobeView(
                     val sx = lastX
                     val sy = lastY
                     queueEvent {
+                        velocity.fill(0.0)
                         renderer.camera.update()
-                        grab = renderer.camera.screenToLatLon(sx, sy)
+                        grab = renderer.camera.surfacePoint(sx, sy)
                     }
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (event.actionMasked == MotionEvent.ACTION_UP) performClick()
-                if (mode == Mode.DRAG) {
-                    val stale = event.eventTime - lastTime > 80
-                    val vLat = if (stale) 0.0 else velLat
-                    val vLon = if (stale) 0.0 else velLon
-                    if (abs(vLat) > 0.02 || abs(vLon) > 0.02) {
-                        queueEvent { renderer.setFling(vLat, vLon) }
-                        requestRender()
-                    }
+                val allowFling = event.actionMasked == MotionEvent.ACTION_UP && mode == Mode.DRAG && event.eventTime - lastTime <= 80
+                queueEvent {
+                    if (allowFling && velocity.any { abs(it) > 0.02 }) renderer.setFling(velocity)
+                    velocity.fill(0.0)
+                    grab = null
                 }
+                requestRender()
                 mode = Mode.NONE
-                grab = null
             }
         }
     }
@@ -245,61 +238,28 @@ class GlobeView(
         val cam = renderer.camera
         cam.update()
         val g = grab
-        val cur = cam.screenToLatLon(sx, sy)
-        var dLat = 0.0
-        var dLon = 0.0
-        if (g != null && cur != null) {
-            val lat0 = cam.centerLat
-            val lon0 = cam.centerLon
-            // 緯度経度の差分で近似し、数回反復して指の下の地点を一致させる
-            for (k in 0 until 3) {
-                val c = if (k == 0) cur else (cam.screenToLatLon(sx, sy) ?: break)
-                cam.centerLat += g[0] - c[0]
-                cam.centerLon += Camera.wrapLon(g[1] - c[1])
-                cam.clamp()
-                cam.update()
-            }
-            // 極付近での暴走を抑える
-            val limit = cam.radiansPerPixel() * 120 * density
-            dLat = (cam.centerLat - lat0).coerceIn(-limit, limit)
-            dLon = Camera.wrapLon(cam.centerLon - lon0).coerceIn(-limit * 3, limit * 3)
-            cam.centerLat = lat0 + dLat
-            cam.centerLon = lon0 + dLon
-        } else {
-            val rpp = cam.radiansPerPixel()
-            dLat = dy * rpp
-            dLon = -dx * rpp / max(cos(cam.centerLat), 0.2)
-            cam.centerLat += dLat
-            cam.centerLon += dLon
-            grab = null
+        val delta = g?.let { cam.moveSurfacePoint(it, sx, sy) } ?: run {
+            val fallback = cam.dragOutside(dx, dy)
+            grab = cam.surfacePoint(sx, sy)
+            fallback
         }
-        cam.clamp()
+        val movement = delta.vector()
         val dt = dtMs / 1000.0
-        val a = 0.5
-        velLat = velLat * (1 - a) + (dLat / dt) * a
-        velLon = velLon * (1 - a) + (dLon / dt) * a
-        // 極限に張り付いたら速度を殺す
-        if (abs(cam.centerLat) >= Camera.MAX_LAT - 1e-9) velLat = 0.0
+        for (i in velocity.indices) velocity[i] = (velocity[i] + movement[i] / dt) * 0.5
     }
 
     /** GL スレッド: 焦点の下の地表点を固定したまま高度を変える。 */
     private fun applyPinch(scale: Double, fx: Float, fy: Float) {
         val cam = renderer.camera
         cam.update()
-        val before = grab ?: cam.screenToLatLon(fx, fy)
+        val before = grab ?: cam.surfacePoint(fx, fy)
         cam.altitude = (cam.altitude / scale).coerceIn(Camera.MIN_ALT, Camera.MAX_ALT)
         cam.update()
         if (before != null) {
-            for (k in 0 until 3) {
-                val after = cam.screenToLatLon(fx, fy) ?: break
-                cam.centerLat += before[0] - after[0]
-                cam.centerLon += Camera.wrapLon(before[1] - after[1])
-                cam.clamp()
-                cam.update()
-            }
+            cam.moveSurfacePoint(before, fx, fy)
             grab = before
         } else {
-            grab = cam.screenToLatLon(fx, fy)
+            grab = cam.surfacePoint(fx, fy)
         }
     }
 

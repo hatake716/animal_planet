@@ -33,7 +33,7 @@ class GlobeRenderer(
     context: Context,
     entries: List<Entry>,
     private val requestRender: () -> Unit,
-    private val onCameraIdle: (lat: Double, lon: Double, alt: Double) -> Unit,
+    private val onCameraIdle: (lat: Double, lon: Double, alt: Double, rotation: Rotation) -> Unit,
 ) : GLSurfaceView.Renderer {
 
     val camera = Camera()
@@ -59,16 +59,17 @@ class GlobeRenderer(
     private val resolved = TileManager.Resolved()
 
     // ---- アニメーション状態 ----
-    private var flingLat = 0.0
-    private var flingLon = 0.0
-    private var flyFrom: DoubleArray? = null
-    private var flyTo: DoubleArray? = null
+    private var fling = DoubleArray(3)
+    private var flyFrom: Rotation? = null
+    private var flyTo: Rotation? = null
+    private var flyFromAlt = 0.0
+    private var flyToAlt = 0.0
+    private var flyDistance = 0.0
     private var flyStart = 0L
     private var flyDuration = 0L
     private var idleNotified = true
     // カメラ位置の変化検知(ドラッグ/ピンチだけで動いたフレームも idle 通知の対象にする)
-    private var prevLat = Double.NaN
-    private var prevLon = Double.NaN
+    private var prevRotation: Rotation? = null
     private var prevAlt = Double.NaN
 
     private class Mesh(val vertices: FloatBuffer, val indices: ShortBuffer, val indexCount: Int)
@@ -145,8 +146,8 @@ class GlobeRenderer(
         tiles.evict(frame)
 
         // カメラが前フレームから動いていたら idle 状態を解除する(ドラッグ/ピンチ由来の移動も拾う)
-        val moved = camera.centerLat != prevLat || camera.centerLon != prevLon || camera.altitude != prevAlt
-        prevLat = camera.centerLat; prevLon = camera.centerLon; prevAlt = camera.altitude
+        val moved = camera.rotation != prevRotation || camera.altitude != prevAlt
+        prevRotation = camera.rotation; prevAlt = camera.altitude
         if (moved) idleNotified = false
 
         if (animating || uploaded || tiles.hasPending) {
@@ -154,35 +155,47 @@ class GlobeRenderer(
             requestRender()
         } else if (!idleNotified) {
             idleNotified = true
-            onCameraIdle(camera.centerLat, camera.centerLon, camera.altitude)
+            onCameraIdle(camera.centerLat, camera.centerLon, camera.altitude, camera.rotation)
         }
     }
 
     // ------------------------------------------------------------ camera ops (GL thread)
     fun stopAnimations() {
-        flingLat = 0.0
-        flingLon = 0.0
+        fling.fill(0.0)
         flyFrom = null
         flyTo = null
     }
 
-    fun setFling(latPerSec: Double, lonPerSec: Double) {
-        flingLat = latPerSec
-        flingLon = lonPerSec
+    fun setFling(radiansPerSec: DoubleArray) {
+        fling = radiansPerSec.copyOf()
     }
 
     /** 指定地点へ滑らかに移動する。altitude は目標高度。 */
     fun flyTo(lat: Double, lon: Double, altitude: Double, durationMs: Long = 1400) {
+        animateTo(Rotation.northUp(lat, lon), altitude, durationMs)
+    }
+
+    /** 拡大・全体表示では、極を越えた後も現在の画面の向きを維持する。 */
+    fun zoomTo(altitude: Double, durationMs: Long) {
+        animateTo(camera.rotation, altitude, durationMs)
+    }
+
+    fun focusOn(point: DoubleArray, altitude: Double, durationMs: Long) {
+        val turn = Rotation.between(camera.rotation.apply(point), doubleArrayOf(0.0, 0.0, 1.0))
+        animateTo(turn * camera.rotation, altitude, durationMs)
+    }
+
+    private fun animateTo(rotation: Rotation, altitude: Double, durationMs: Long) {
         stopAnimations()
-        val fromLon = camera.centerLon
-        var toLon = Camera.wrapLon(lon)
-        // 経度は近い方向へ回る
-        if (toLon - fromLon > PI) toLon -= 2 * PI
-        if (toLon - fromLon < -PI) toLon += 2 * PI
-        flyFrom = doubleArrayOf(camera.centerLat, fromLon, camera.altitude)
-        flyTo = doubleArrayOf(lat.coerceIn(-Camera.MAX_LAT, Camera.MAX_LAT), toLon, altitude.coerceIn(Camera.MIN_ALT, Camera.MAX_ALT))
+        flyFrom = camera.rotation
+        flyTo = rotation
+        flyFromAlt = camera.altitude
+        flyToAlt = altitude.coerceIn(Camera.MIN_ALT, Camera.MAX_ALT)
+        val a = camera.rotation.inverse().apply(doubleArrayOf(0.0, 0.0, 1.0))
+        val b = rotation.inverse().apply(doubleArrayOf(0.0, 0.0, 1.0))
+        flyDistance = kotlin.math.acos(a.indices.sumOf { a[it] * b[it] }.coerceIn(-1.0, 1.0))
         flyStart = System.nanoTime()
-        flyDuration = durationMs
+        flyDuration = durationMs.coerceAtLeast(1)
     }
 
     private fun stepAnimation(now: Long, dt: Double): Boolean {
@@ -192,21 +205,17 @@ class GlobeRenderer(
         if (from != null && to != null) {
             val t = ((now - flyStart) / 1e6 / flyDuration).coerceIn(0.0, 1.0)
             val e = easeInOut(t)
-            camera.centerLat = from[0] + (to[0] - from[0]) * e
-            camera.centerLon = from[1] + (to[1] - from[1]) * e
+            camera.rotation = from.interpolate(to, e)
             // 高度は遠い移動ほど一度上がってから下りる
-            val dist = Camera.angularDistance(from[0], from[1], to[0], to[1])
-            val bump = min(1.8, dist * 1.2) * max(0.0, 1.0 - max(from[2], to[2]) / 1.5)
-            camera.altitude = from[2] + (to[2] - from[2]) * e + bump * sin(PI * t)
+            val bump = min(1.8, flyDistance * 1.2) * max(0.0, 1.0 - max(flyFromAlt, flyToAlt) / 1.5)
+            camera.altitude = flyFromAlt + (flyToAlt - flyFromAlt) * e + bump * sin(PI * t)
             if (t >= 1.0) { flyFrom = null; flyTo = null } else active = true
         }
-        if (abs(flingLat) > 1e-5 || abs(flingLon) > 1e-5) {
-            camera.centerLat += flingLat * dt
-            camera.centerLon += flingLon * dt
+        if (fling.any { abs(it) > 1e-5 }) {
+            camera.rotation = Rotation.vector(fling[0] * dt, fling[1] * dt, fling[2] * dt) * camera.rotation
             val decay = exp(-dt * 4.0)
-            flingLat *= decay
-            flingLon *= decay
-            if (abs(flingLat) < 1e-5 && abs(flingLon) < 1e-5) { flingLat = 0.0; flingLon = 0.0 } else active = true
+            for (i in fling.indices) fling[i] *= decay
+            if (fling.all { abs(it) < 1e-5 }) fling.fill(0.0) else active = true
         }
         return active
     }

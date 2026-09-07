@@ -14,12 +14,17 @@ import kotlin.math.tan
 
 /**
  * 地球儀カメラ。地球は半径 1 の球。カメラは +Z 軸上 (0,0,1+altitude) から原点を見る。
- * 地球側を回転させ、(centerLat, centerLon) が画面中央 (+Z 方向) に来るようにする。
+ * 地球側を四元数で回転させる。centerLat / centerLon は向きから求める地理座標。
  * 角度はラジアン。フィールドの書き換えは GL スレッドからのみ行う(GlobeView.queueEvent 経由)。
  */
 class Camera {
-    var centerLat = Math.toRadians(35.0)
-    var centerLon = Math.toRadians(135.0)
+    var rotation = Rotation.northUp(Math.toRadians(35.0), Math.toRadians(135.0))
+    var centerLat: Double
+        get() = asin(rotation.inverse().apply(doubleArrayOf(0.0, 0.0, 1.0))[1].coerceIn(-1.0, 1.0))
+        set(value) { rotation = Rotation.northUp(value, centerLon) }
+    var centerLon: Double
+        get() = rotation.inverse().apply(doubleArrayOf(0.0, 0.0, 1.0)).let { atan2(it[0], it[2]) }
+        set(value) { rotation = Rotation.northUp(centerLat, value) }
 
     /** 地表からの高さ(地球半径単位)。 */
     var altitude = 2.2
@@ -46,8 +51,6 @@ class Camera {
     }
 
     fun clamp() {
-        centerLat = centerLat.coerceIn(-MAX_LAT, MAX_LAT)
-        centerLon = wrapLon(centerLon)
         altitude = altitude.coerceIn(MIN_ALT, MAX_ALT)
     }
 
@@ -59,18 +62,10 @@ class Camera {
         val far = altitude + 2.5
         Mat4.perspective(projection, Math.toDegrees(fovY).toFloat(), aspect.toFloat(), near.toFloat(), far.toFloat())
         Mat4.lookAtFromZ(view, (1.0 + altitude).toFloat())
-        Mat4.identity(model)
-        Mat4.rotateX(model, Math.toDegrees(centerLat))
-        Mat4.rotateY(model, Math.toDegrees(-centerLon))
+        rotation.matrix(model)
         Mat4.multiply(viewProjection, projection, view)
         Mat4.multiply(mvp, viewProjection, model)
-        // カメラ位置を地球座標系へ: model の逆回転 = Ry(lon) * Rx(-lat) を (0,0,1+alt) に適用
-        val d = 1.0 + altitude
-        val y1 = d * sin(centerLat)
-        val z1 = d * cos(centerLat)
-        eyeInEarth[0] = z1 * sin(centerLon)
-        eyeInEarth[1] = y1
-        eyeInEarth[2] = z1 * cos(centerLon)
+        rotation.inverse().apply(doubleArrayOf(0.0, 0.0, 1.0 + altitude)).copyInto(eyeInEarth)
     }
 
     /** 画面上での地球半径(px)。 */
@@ -100,7 +95,7 @@ class Camera {
         out[0] = ((nx + 1) * 0.5 * viewportWidth).toFloat()
         out[1] = ((1 - ny) * 0.5 * viewportHeight).toFloat()
         out[2] = nz.toFloat()
-        return nx >= -1.1 && nx <= 1.1 && ny >= -1.1 && ny <= 1.1 && nz <= 1.0
+        return nx >= -1.1 && nx <= 1.1 && ny >= -1.1 && ny <= 1.1 && nz >= -1.0 && nz <= 1.0
     }
 
     /** 地表点が視点から見て手前側(地平線より内側)か。 */
@@ -111,44 +106,56 @@ class Camera {
 
     /** 画面座標から地表(単位球)との交点を求め、緯度経度(ラジアン)を返す。外れたら null。 */
     fun screenToLatLon(sx: Float, sy: Float): DoubleArray? {
-        val ray = screenRay(sx, sy)
-        val e = eyeInEarth
-        val b = 2 * (e[0] * ray[0] + e[1] * ray[1] + e[2] * ray[2])
-        val c = e[0] * e[0] + e[1] * e[1] + e[2] * e[2] - 1.0
+        val point = surfacePoint(sx, sy) ?: return null
+        return doubleArrayOf(asin(point[1].coerceIn(-1.0, 1.0)), atan2(point[0], point[2]))
+    }
+
+    /** 画面上の点の直下にある地表を、極で特異点を持たない地球座標で返す。 */
+    fun surfacePoint(sx: Float, sy: Float): DoubleArray? = screenSpherePoint(sx, sy)?.let { rotation.inverse().apply(it) }
+
+    /** 視線と球の交点。回転前の画面座標系なので、カメラ行列の float 誤差を含まない。 */
+    private fun screenSpherePoint(sx: Float, sy: Float): DoubleArray? {
+        val ray = viewRay(sx, sy)
+        val d = 1.0 + altitude
+        val b = 2 * d * ray[2]
+        val c = d * d - 1.0
         val disc = b * b - 4 * c
         if (disc < 0) return null
         val t = (-b - sqrt(disc)) / 2
         if (t < 0) return null
-        val px = e[0] + t * ray[0]
-        val py = e[1] + t * ray[1]
-        val pz = e[2] + t * ray[2]
-        return doubleArrayOf(asin(py.coerceIn(-1.0, 1.0)), atan2(px, pz))
+        val point = doubleArrayOf(t * ray[0], t * ray[1], d + t * ray[2])
+        val length = sqrt(point.sumOf { it * it })
+        return DoubleArray(3) { point[it] / length }
     }
 
     /** 画面座標から地球座標系での視線方向(正規化)。 */
-    fun screenRay(sx: Float, sy: Float): DoubleArray {
-        val nx = sx / viewportWidth * 2 - 1
-        val ny = 1 - sy / viewportHeight * 2
+    fun screenRay(sx: Float, sy: Float): DoubleArray = rotation.inverse().apply(viewRay(sx, sy))
+
+    private fun viewRay(sx: Float, sy: Float): DoubleArray {
+        val nx = sx.toDouble() / viewportWidth * 2 - 1
+        val ny = 1 - sy.toDouble() / viewportHeight * 2
         val aspect = viewportWidth.toDouble() / viewportHeight
         val t = tan(fovY / 2)
-        var dx = nx * t * aspect
-        var dy = ny * t
-        var dz = -1.0
-        // カメラ座標系 → 地球座標系: Ry(lon) * Rx(-lat)
-        val cl = cos(centerLat)
-        val sl = sin(centerLat)
-        val y1 = dy * cl + dz * sl
-        val z1 = -dy * sl + dz * cl
-        dy = y1
-        dz = z1
-        val cn = cos(centerLon)
-        val sn = sin(centerLon)
-        val x2 = dx * cn + dz * sn
-        val z2 = -dx * sn + dz * cn
-        dx = x2
-        dz = z2
+        val dx = nx * t * aspect
+        val dy = ny * t
+        val dz = -1.0
         val len = sqrt(dx * dx + dy * dy + dz * dz)
         return doubleArrayOf(dx / len, dy / len, dz / len)
+    }
+
+    /** 掴んだ地表を指の位置へ正確に運ぶ。緯度差・経度差による反復近似は使わない。 */
+    fun moveSurfacePoint(point: DoubleArray, sx: Float, sy: Float): Rotation? {
+        val target = screenSpherePoint(sx, sy) ?: return null
+        val delta = Rotation.between(rotation.apply(point), target)
+        rotation = delta * rotation
+        return delta
+    }
+
+    /** 地球の外側をドラッグした場合も画面の方向へ連続して回す。 */
+    fun dragOutside(dx: Float, dy: Float): Rotation {
+        val delta = Rotation.vector(dy * radiansPerPixel(), dx * radiansPerPixel(), 0.0)
+        rotation = delta * rotation
+        return delta
     }
 
     /** 画面中央から地平線までの角度半径(ラジアン)。 */
@@ -164,15 +171,13 @@ class Camera {
     }
 
     fun copyFrom(o: Camera) {
-        centerLat = o.centerLat
-        centerLon = o.centerLon
+        rotation = o.rotation
         altitude = o.altitude
     }
 
     companion object {
         const val MIN_ALT = 0.0019
         const val MAX_ALT = 9.0
-        val MAX_LAT: Double = Math.toRadians(89.0)
 
         fun wrapLon(lon: Double): Double {
             var l = lon

@@ -12,6 +12,7 @@ import io.github.hatake716.animalplanet.data.Entry
 import io.github.hatake716.animalplanet.data.TaxonGroup
 import io.github.hatake716.animalplanet.data.UserDataRepository
 import io.github.hatake716.animalplanet.globe.MarkerFilter
+import io.github.hatake716.animalplanet.globe.Rotation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -61,10 +62,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** 詳細カードの展開状態。ピンをタップした時点で詳細(写真・解説・生息環境・脅威)を全部見せる。 */
     var detailExpanded by mutableStateOf(true)
 
-    /** カメラの復元用(度、高度)。 */
+    /** カメラの復元用。緯度・経度に加えて、極を越えた向きも四元数で保持する。 */
     var savedLat = 20.0
     var savedLon = 100.0
     var savedAlt = 0.0
+    var savedRotation: Rotation? = null
 
     private val prefs = app.getSharedPreferences("globe", Context.MODE_PRIVATE)
 
@@ -72,6 +74,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         savedLat = prefs.getFloat("lat", 20f).toDouble()
         savedLon = prefs.getFloat("lon", 100f).toDouble()
         savedAlt = prefs.getFloat("alt", 0f).toDouble()
+        savedRotation = if (prefs.contains("rotation_w")) runCatching {
+            Rotation.of(
+                prefs.getFloat("rotation_w", 1f).toDouble(), prefs.getFloat("rotation_x", 0f).toDouble(),
+                prefs.getFloat("rotation_y", 0f).toDouble(), prefs.getFloat("rotation_z", 0f).toDouble(),
+            )
+        }.getOrNull() else null
         viewModelScope.launch {
             try {
                 val c = withContext(Dispatchers.IO) { Catalog.load(getApplication()) }
@@ -116,9 +124,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchResults = if (c == null || q.isBlank()) emptyList() else c.search(q)
     }
 
-    fun saveCamera(latDeg: Double, lonDeg: Double, alt: Double) {
+    fun saveCamera(latDeg: Double, lonDeg: Double, alt: Double, rotation: Rotation) {
         savedLat = latDeg; savedLon = lonDeg; savedAlt = alt
-        prefs.edit().putFloat("lat", latDeg.toFloat()).putFloat("lon", lonDeg.toFloat()).putFloat("alt", alt.toFloat()).apply()
+        savedRotation = rotation
+        prefs.edit().putFloat("lat", latDeg.toFloat()).putFloat("lon", lonDeg.toFloat()).putFloat("alt", alt.toFloat())
+            .putFloat("rotation_w", rotation.w.toFloat()).putFloat("rotation_x", rotation.x.toFloat())
+            .putFloat("rotation_y", rotation.y.toFloat()).putFloat("rotation_z", rotation.z.toFloat()).apply()
     }
 
     fun openWikipedia(e: Entry) {

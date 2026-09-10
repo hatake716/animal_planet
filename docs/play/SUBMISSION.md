@@ -14,6 +14,7 @@ Play の要件との照合結果は [`POLICY_CHECK.md`](POLICY_CHECK.md) にあ�
 | アプリアイコン 512×512 | `icon_512.png` |
 | フィーチャーグラフィック 1024×500 | `feature_1024x500.png` |
 | スマートフォン用スクリーンショット 1080×2160、24-bit PNG(7 枚) | `screenshots/01_globe.png` 〜 `07_filtered.png` |
+| プレビュー動画(29.8 秒 / 1080×1920)と YouTube 公開手順 | `dist/play-v1.0.3/promo_1080x1920.mp4` ／ [`VIDEO.md`](VIDEO.md) |
 | プライバシーポリシー URL | https://hatake716.github.io/animal_planet/PRIVACY/ |
 | 出典・ライセンス(審査での問い合わせに備えて) | [`../../NOTICE.md`](../../NOTICE.md)、[`../CREDITS.md`](../CREDITS.md) |
 
@@ -48,6 +49,7 @@ Play Console の設問と回答は [`FORMS.md`](FORMS.md) の順番どおり。�
 
 - アプリ名(30 文字以内)、簡単な説明(80 文字以内)、詳しい説明(4000 文字以内)。
 - グラフィック: アイコン `icon_512.png`、フィーチャーグラフィック `feature_1024x500.png`、スマートフォンのスクリーンショット `screenshots/*.png`(2〜8 枚。1080×2160 は「最大辺が最小辺の 2 倍以下」の規則を満たす)。7 インチ / 10 インチ タブレット用は任意。
+- プレビュー動画: **Play は動画ファイルを受け付けず YouTube の URL のみ**。`promo_1080x1920.mp4` を YouTube に上げ(収益化オフ・一般公開または限定公開・年齢制限なし・埋め込み許可)、`https://www.youtube.com/watch?v=...` を入力する。詳細は [`VIDEO.md`](VIDEO.md)。
 
 ## 5. リリース
 
